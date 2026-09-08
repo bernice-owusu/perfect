@@ -1,0 +1,6 @@
+{
+  "name": "Perfect For You",
+  "description": "Healthy Hair, Happy Skin — Natural botanical beauty & lifestyle essentials in Ghana with verified Paystack checkout and tracked delivery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

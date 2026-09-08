@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120" fill="none">
+  <!-- Botanical 'P' Emblem -->
+  <g transform="translate(10, 0)">
+    <!-- Outer P Silhouette -->
+    <path
+      d="M48 18 H74 C91.5 18 102 28.5 102 43 C102 57.5 91 67.5 73.5 67.5 H58.5 V98 C58.5 100.5 56.5 102 53.5 102 C50.5 102 48 100.5 48 98 V18 Z"
+      fill="#1a3c34"
+    />
+    <!-- Inner P Counter Cutout -->
+    <path
+      d="M58.5 28.5 H72 C81 28.5 88 34.5 88 43 C88 51.5 81 57.5 72 57.5 H58.5 V28.5 Z"
+      fill="#f5f2ed"
+    />
+    <!-- Inner Botanical Leaf inside the bowl -->
+    <path
+      d="M51 64 C50 48 60 30 84 25 C82 43 70 59 51 64 Z"
+      fill="#1a3c34"
+    />
+    <!-- Inner Leaf Vein -->
+    <path
+      d="M54 60 Q 64 45 81 28"
+      stroke="#f5f2ed"
+      stroke-width="2"
+      stroke-linecap="round"
+    />
+    <!-- Sprouting Left Leaf -->
+    <path
+      d="M50 56 C38 42 22 46 16 54 C 20 66 36 71 50 63 Z"
+      fill="#1a3c34"
+    />
+    <!-- Left Leaf Vein -->
+    <path
+      d="M48 61 Q 32 58 20 53"
+      stroke="#f5f2ed"
+      stroke-width="1.8"
+      stroke-linecap="round"
+    />
+  </g>
+
+  <!-- Typography -->
+  <text x="130" y="58" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="28" font-weight="700" letter-spacing="3" fill="#1a3c34">PERFECT FOR YOU</text>
+  <text x="132" y="82" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="16" font-weight="500" letter-spacing="0.5" fill="#5a5a40">Healthy Hair, Happy Skin</text>
+</svg>
