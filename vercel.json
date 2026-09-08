@@ -3,14 +3,14 @@
   "outputDirectory": "dist",
   "buildCommand": "npm run build",
   "functions": {
-    "api/index.mjs": {
+    "api/index.js": {
       "maxDuration": 10
     }
   },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.mjs"
+      "destination": "/api/index.js"
     },
     {
       "source": "/((?!api/).*)",
