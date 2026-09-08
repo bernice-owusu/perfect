@@ -4,7 +4,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import type { Product, Category, Order, StoreSettings, CustomerReview } from "./src/types.ts";
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const app = express();
 app.use(express.json());
 
@@ -1162,7 +1162,11 @@ app.get("/api/reviews", (_req, res) => {
 // VITE MIDDLEWARE & STATIC SERVER
 // -------------------------------------------------------------
 async function start() {
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    !fs.existsSync(path.join(process.cwd(), "vite.config.ts"));
+
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
