@@ -1,8 +1,9 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import type { Product, Category, Order, StoreSettings, CustomerReview } from "./src/types.ts";
+import { isSupabaseConfigured, loadAllFromSupabase, saveAllToSupabase } from "./supabaseDb.ts";
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -721,7 +722,7 @@ interface StoreData {
   reviews: CustomerReview[];
 }
 
-function loadData(): StoreData {
+function loadDataFromFile(): StoreData {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const content = fs.readFileSync(DATA_FILE, "utf-8");
@@ -731,19 +732,54 @@ function loadData(): StoreData {
     console.error("Error reading store file, falling back to defaults:", err);
   }
 
-  // initialize
-  const data: StoreData = {
+  return {
     products: initialProducts,
     categories: initialCategories,
     orders: initialOrders,
     settings: initialSettings,
     reviews: initialReviews,
   };
-  saveData(data);
-  return data;
 }
 
-function saveData(data: StoreData) {
+let store: StoreData = loadDataFromFile();
+let cachedAt = 0;
+const CACHE_TTL_MS = 5000;
+
+// Loads the current store from Supabase (seeding it from the local data on
+// first run) or falls back to the in-memory/local-file store.
+async function loadStoreFromSupabase(seedData?: StoreData): Promise<StoreData> {
+  if (!isSupabaseConfigured()) return store;
+  try {
+    const data = await loadAllFromSupabase();
+    if (data.products.length || data.settings) {
+      store = data;
+    } else {
+      // Fresh DB -> migrate the existing seed data into Supabase
+      const seed = seedData ?? {
+        products: initialProducts,
+        categories: initialCategories,
+        orders: initialOrders,
+        settings: initialSettings,
+        reviews: initialReviews,
+      };
+      await saveAllToSupabase(seed);
+      store = seed;
+    }
+    cachedAt = Date.now();
+  } catch (err) {
+    console.error("[supabase] load failed, using local store:", err);
+  }
+  return store;
+}
+
+// Async refresh: re-loads from Supabase when the cache is stale.
+async function refreshStore(): Promise<StoreData> {
+  if (!isSupabaseConfigured()) return store;
+  if (Date.now() - cachedAt < CACHE_TTL_MS) return store;
+  return loadStoreFromSupabase();
+}
+
+async function saveData(data: StoreData) {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -752,9 +788,20 @@ function saveData(data: StoreData) {
   } catch (err) {
     console.error("Error saving store file:", err);
   }
+
+  if (isSupabaseConfigured()) {
+    try {
+      await saveAllToSupabase(data);
+      cachedAt = Date.now();
+    } catch (err) {
+      console.error("[supabase] save failed:", err);
+    }
+  }
 }
 
-let store = loadData();
+async function initStore(): Promise<StoreData> {
+  return loadStoreFromSupabase(store);
+}
 
 // Helper to calculate next order number
 function generateOrderNumber(): string {
@@ -772,18 +819,20 @@ app.get("/api/health", (_req, res) => {
 });
 
 // Settings
-app.get("/api/settings", (_req, res) => {
+app.get("/api/settings", async (_req, res) => {
+  await refreshStore();
   res.json({ settings: store.settings });
 });
 
-app.put("/api/settings", (req, res) => {
+app.put("/api/settings", async (req, res) => {
   store.settings = { ...store.settings, ...req.body };
-  saveData(store);
+  await saveData(store);
   res.json({ success: true, settings: store.settings });
 });
 
 // Categories
-app.get("/api/categories", (_req, res) => {
+app.get("/api/categories", async (_req, res) => {
+  await refreshStore();
   // compute current item counts
   const categoriesWithCounts = store.categories.map((cat) => {
     const count = store.products.filter(
@@ -794,7 +843,7 @@ app.get("/api/categories", (_req, res) => {
   res.json({ categories: categoriesWithCounts });
 });
 
-app.post("/api/categories", (req, res) => {
+app.post("/api/categories", async (req, res) => {
   const { name, description, image, is_active } = req.body;
   if (!name) {
     return res.status(400).json({ error: "Category name is required" });
@@ -809,21 +858,22 @@ app.post("/api/categories", (req, res) => {
     is_active: is_active !== false,
   };
   store.categories.push(newCat);
-  saveData(store);
+  await saveData(store);
   res.status(201).json({ success: true, category: newCat });
 });
 
-app.put("/api/categories/:id", (req, res) => {
+app.put("/api/categories/:id", async (req, res) => {
   const index = store.categories.findIndex((c) => c.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Category not found" });
 
   store.categories[index] = { ...store.categories[index], ...req.body };
-  saveData(store);
+  await saveData(store);
   res.json({ success: true, category: store.categories[index] });
 });
 
 // Products
-app.get("/api/products", (req, res) => {
+app.get("/api/products", async (req, res) => {
+  await refreshStore();
   const { category, search, featured, active_only, sort } = req.query;
   let list = [...store.products];
 
@@ -874,7 +924,8 @@ app.get("/api/products", (req, res) => {
   res.json({ products: list, total: list.length });
 });
 
-app.get("/api/products/:idOrSlug", (req, res) => {
+app.get("/api/products/:idOrSlug", async (req, res) => {
+  await refreshStore();
   const { idOrSlug } = req.params;
   const prod = store.products.find(
     (p) => p.id === idOrSlug || p.slug === idOrSlug
@@ -883,7 +934,7 @@ app.get("/api/products/:idOrSlug", (req, res) => {
   res.json({ product: prod });
 });
 
-app.post("/api/products", (req, res) => {
+app.post("/api/products", async (req, res) => {
   const {
     name,
     category_id,
@@ -932,11 +983,11 @@ app.post("/api/products", (req, res) => {
   };
 
   store.products.unshift(newProd);
-  saveData(store);
+  await saveData(store);
   res.status(201).json({ success: true, product: newProd });
 });
 
-app.put("/api/products/:id", (req, res) => {
+app.put("/api/products/:id", async (req, res) => {
   const index = store.products.findIndex((p) => p.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Product not found" });
 
@@ -956,23 +1007,24 @@ app.put("/api/products/:id", (req, res) => {
   }
 
   store.products[index] = updated;
-  saveData(store);
+  await saveData(store);
   res.json({ success: true, product: updated });
 });
 
-app.delete("/api/products/:id", (req, res) => {
+app.delete("/api/products/:id", async (req, res) => {
   const index = store.products.findIndex((p) => p.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Product not found" });
 
   // Soft delete per PRD recommendation #24
   store.products[index].is_active = false;
   store.products[index].updated_at = new Date().toISOString();
-  saveData(store);
+  await saveData(store);
   res.json({ success: true, message: "Product deactivated (soft-deleted)", product: store.products[index] });
 });
 
 // Orders & Checkout
-app.post("/api/orders", (req, res) => {
+app.post("/api/orders", async (req, res) => {
+  await refreshStore();
   const {
     customer_name,
     email,
@@ -1027,7 +1079,7 @@ app.post("/api/orders", (req, res) => {
   };
 
   store.orders.unshift(newOrder);
-  saveData(store);
+  await saveData(store);
 
   res.status(201).json({
     success: true,
@@ -1037,7 +1089,8 @@ app.post("/api/orders", (req, res) => {
 });
 
 // Order tracking endpoint
-app.get("/api/orders/track", (req, res) => {
+app.get("/api/orders/track", async (req, res) => {
+  await refreshStore();
   const { order_number, query } = req.query;
   if (!order_number && !query) {
     return res.status(400).json({ error: "Order number is required" });
@@ -1060,7 +1113,8 @@ app.get("/api/orders/track", (req, res) => {
 });
 
 // Admin orders listing
-app.get("/api/orders", (req, res) => {
+app.get("/api/orders", async (req, res) => {
+  await refreshStore();
   const { status, search } = req.query;
   let list = [...store.orders];
 
@@ -1082,14 +1136,14 @@ app.get("/api/orders", (req, res) => {
   res.json({ orders: list, total: list.length });
 });
 
-app.put("/api/orders/:id/status", (req, res) => {
+app.put("/api/orders/:id/status", async (req, res) => {
   const { status } = req.body;
   const order = store.orders.find((o) => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: "Order not found" });
 
   order.order_status = status;
   order.updated_at = new Date().toISOString();
-  saveData(store);
+  await saveData(store);
   res.json({ success: true, order });
 });
 
@@ -1135,7 +1189,8 @@ app.post("/api/admin/login", (req, res) => {
 });
 
 // Admin Stats
-app.get("/api/admin/stats", (_req, res) => {
+app.get("/api/admin/stats", async (_req, res) => {
+  await refreshStore();
   const totalSales = store.orders.reduce((sum, o) => (o.payment_status === "paid" ? sum + o.total : sum), 0);
   const totalOrders = store.orders.length;
   const totalProducts = store.products.length;
@@ -1154,12 +1209,13 @@ app.get("/api/admin/stats", (_req, res) => {
 });
 
 // Reviews
-app.get("/api/reviews", (_req, res) => {
+app.get("/api/reviews", async (_req, res) => {
+  await refreshStore();
   res.json({ reviews: store.reviews });
 });
 
 // -------------------------------------------------------------
-// VITE MIDDLEWARE & STATIC SERVER
+// VITE MIDDLEWARE & STATIC SERVER (local dev / self-hosted only)
 // -------------------------------------------------------------
 async function start() {
   const isProduction =
@@ -1167,6 +1223,7 @@ async function start() {
     !fs.existsSync(path.join(process.cwd(), "vite.config.ts"));
 
   if (!isProduction) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -1185,4 +1242,16 @@ async function start() {
   });
 }
 
-start();
+// When running directly (local dev / self-hosted), start the full server.
+// On Vercel, this module is only used for its exported `app` handler
+// (see api/index.ts); Vercel's serverless runtime invokes the handler, so we
+// must NOT call app.listen in that context.
+if (!process.env.VERCEL) {
+  initStore().then(start).catch((err) => {
+    console.error("Failed to initialize store:", err);
+    start();
+  });
+}
+
+export default app;
+export { initStore };
