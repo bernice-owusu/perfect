@@ -1,17 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "dist",
+  "buildCommand": "npm run build",
   "functions": {
-    "api/index.ts": {
+    "api/index.mjs": {
       "maxDuration": 10
     }
   },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/index.mjs"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
