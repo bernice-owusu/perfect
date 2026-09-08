@@ -3,7 +3,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import type { Product, Category, Order, StoreSettings, CustomerReview } from "./src/types.ts";
-import { isSupabaseConfigured, loadAllFromSupabase, saveAllToSupabase } from "./supabaseDb.ts";
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -742,41 +741,11 @@ function loadDataFromFile(): StoreData {
 }
 
 let store: StoreData = loadDataFromFile();
-let cachedAt = 0;
-const CACHE_TTL_MS = 5000;
 
-// Loads the current store from Supabase (seeding it from the local data on
-// first run) or falls back to the in-memory/local-file store.
-async function loadStoreFromSupabase(seedData?: StoreData): Promise<StoreData> {
-  if (!isSupabaseConfigured()) return store;
-  try {
-    const data = await loadAllFromSupabase();
-    if (data.products.length || data.settings) {
-      store = data;
-    } else {
-      // Fresh DB -> migrate the existing seed data into Supabase
-      const seed = seedData ?? {
-        products: initialProducts,
-        categories: initialCategories,
-        orders: initialOrders,
-        settings: initialSettings,
-        reviews: initialReviews,
-      };
-      await saveAllToSupabase(seed);
-      store = seed;
-    }
-    cachedAt = Date.now();
-  } catch (err) {
-    console.error("[supabase] load failed, using local store:", err);
-  }
-  return store;
-}
-
-// Async refresh: re-loads from Supabase when the cache is stale.
+// Store is loaded once from the local data file at boot. Kept as an async
+// function to preserve the call sites that await it.
 async function refreshStore(): Promise<StoreData> {
-  if (!isSupabaseConfigured()) return store;
-  if (Date.now() - cachedAt < CACHE_TTL_MS) return store;
-  return loadStoreFromSupabase();
+  return store;
 }
 
 async function saveData(data: StoreData) {
@@ -788,19 +757,10 @@ async function saveData(data: StoreData) {
   } catch (err) {
     console.error("Error saving store file:", err);
   }
-
-  if (isSupabaseConfigured()) {
-    try {
-      await saveAllToSupabase(data);
-      cachedAt = Date.now();
-    } catch (err) {
-      console.error("[supabase] save failed:", err);
-    }
-  }
 }
 
 async function initStore(): Promise<StoreData> {
-  return loadStoreFromSupabase(store);
+  return store;
 }
 
 // Helper to calculate next order number
@@ -1244,7 +1204,7 @@ async function start() {
 
 // When running directly (local dev / self-hosted), start the full server.
 // On Vercel, this module is only used for its exported `app` handler
-// (see api/index.ts); Vercel's serverless runtime invokes the handler, so we
+// (see api/handler.ts); Vercel's serverless runtime invokes the handler, so we
 // must NOT call app.listen in that context.
 if (!process.env.VERCEL) {
   initStore().then(start).catch((err) => {

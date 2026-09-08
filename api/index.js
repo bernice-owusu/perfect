@@ -26,106 +26,18 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// api/index.ts
-var index_exports = {};
-__export(index_exports, {
+// api/handler.ts
+var handler_exports = {};
+__export(handler_exports, {
   default: () => handler
 });
-module.exports = __toCommonJS(index_exports);
+module.exports = __toCommonJS(handler_exports);
 
 // server.ts
 var import_config = require("dotenv/config");
 var import_express = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_fs = __toESM(require("fs"), 1);
-
-// supabaseDb.ts
-var import_supabase_js = require("@supabase/supabase-js");
-function isSupabaseConfigured() {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
-}
-var client = null;
-function getClient() {
-  if (!client) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) {
-      throw new Error("Supabase is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing)");
-    }
-    client = (0, import_supabase_js.createClient)(url, key, {
-      auth: { persistSession: false }
-    });
-  }
-  return client;
-}
-function coerceProduct(p) {
-  return {
-    ...p,
-    price: Number(p.price),
-    discount_price: p.discount_price === null || p.discount_price === void 0 ? void 0 : Number(p.discount_price),
-    stock: Number(p.stock),
-    rating: p.rating === null || p.rating === void 0 ? void 0 : Number(p.rating),
-    reviews_count: Number(p.reviews_count ?? 0)
-  };
-}
-function coerceOrder(o) {
-  return {
-    ...o,
-    subtotal: Number(o.subtotal),
-    delivery_fee: Number(o.delivery_fee),
-    total: Number(o.total)
-  };
-}
-async function loadAllFromSupabase() {
-  const sb = getClient();
-  const [categoriesRes, productsRes, ordersRes, settingsRes, reviewsRes] = await Promise.all([
-    sb.from("categories").select("*").order("name"),
-    sb.from("products").select("*"),
-    sb.from("orders").select("*"),
-    sb.from("settings").select("data").eq("id", "default").maybeSingle(),
-    sb.from("reviews").select("*")
-  ]);
-  for (const res of [categoriesRes, productsRes, ordersRes, settingsRes, reviewsRes]) {
-    if (res.error) {
-      throw new Error(`Supabase load error: ${res.error.message}`);
-    }
-  }
-  const products = (productsRes.data ?? []).map(coerceProduct);
-  const orders = (ordersRes.data ?? []).map(coerceOrder);
-  const settings = settingsRes.data?.data || null;
-  return {
-    products,
-    categories: categoriesRes.data ?? [],
-    orders,
-    settings,
-    reviews: reviewsRes.data ?? []
-  };
-}
-async function saveAllToSupabase(data) {
-  const sb = getClient();
-  if (data.products.length) {
-    const { error } = await sb.from("products").upsert(data.products, { onConflict: "id" });
-    if (error) throw new Error(`Supabase products save error: ${error.message}`);
-  }
-  if (data.categories.length) {
-    const { error } = await sb.from("categories").upsert(data.categories, { onConflict: "id" });
-    if (error) throw new Error(`Supabase categories save error: ${error.message}`);
-  }
-  if (data.orders.length) {
-    const { error } = await sb.from("orders").upsert(data.orders, { onConflict: "id" });
-    if (error) throw new Error(`Supabase orders save error: ${error.message}`);
-  }
-  if (data.settings) {
-    const { error } = await sb.from("settings").upsert({ id: "default", data: data.settings }, { onConflict: "id" });
-    if (error) throw new Error(`Supabase settings save error: ${error.message}`);
-  }
-  if (data.reviews.length) {
-    const { error } = await sb.from("reviews").upsert(data.reviews, { onConflict: "id" });
-    if (error) throw new Error(`Supabase reviews save error: ${error.message}`);
-  }
-}
-
-// server.ts
 var PORT = Number(process.env.PORT) || 3e3;
 var app = (0, import_express.default)();
 app.use(import_express.default.json());
@@ -840,35 +752,8 @@ function loadDataFromFile() {
   };
 }
 var store = loadDataFromFile();
-var cachedAt = 0;
-var CACHE_TTL_MS = 5e3;
-async function loadStoreFromSupabase(seedData) {
-  if (!isSupabaseConfigured()) return store;
-  try {
-    const data = await loadAllFromSupabase();
-    if (data.products.length || data.settings) {
-      store = data;
-    } else {
-      const seed = seedData ?? {
-        products: initialProducts,
-        categories: initialCategories,
-        orders: initialOrders,
-        settings: initialSettings,
-        reviews: initialReviews
-      };
-      await saveAllToSupabase(seed);
-      store = seed;
-    }
-    cachedAt = Date.now();
-  } catch (err) {
-    console.error("[supabase] load failed, using local store:", err);
-  }
-  return store;
-}
 async function refreshStore() {
-  if (!isSupabaseConfigured()) return store;
-  if (Date.now() - cachedAt < CACHE_TTL_MS) return store;
-  return loadStoreFromSupabase();
+  return store;
 }
 async function saveData(data) {
   try {
@@ -879,17 +764,9 @@ async function saveData(data) {
   } catch (err) {
     console.error("Error saving store file:", err);
   }
-  if (isSupabaseConfigured()) {
-    try {
-      await saveAllToSupabase(data);
-      cachedAt = Date.now();
-    } catch (err) {
-      console.error("[supabase] save failed:", err);
-    }
-  }
 }
 async function initStore() {
-  return loadStoreFromSupabase(store);
+  return store;
 }
 function generateOrderNumber() {
   const count = store.orders.length + 104;
@@ -1235,7 +1112,7 @@ if (!process.env.VERCEL) {
 }
 var server_default = app;
 
-// api/index.ts
+// api/handler.ts
 var ready;
 async function handler(req, res) {
   if (!ready) {
