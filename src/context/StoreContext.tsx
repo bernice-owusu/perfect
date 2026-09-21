@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import type {
   Product,
   Category,
@@ -15,7 +15,6 @@ export type AppRoute =
   | "cart"
   | "checkout"
   | "order-confirmation"
-  | "order-tracking"
   | "about"
   | "contact"
   | "faq"
@@ -51,11 +50,9 @@ interface StoreContextType {
   isAdminAuthenticated: boolean;
   searchQuery: string;
   selectedCategory: string;
-  hasPurchased: boolean;
 
   // Actions
   navigate: (route: AppRoute, params?: RouteParams) => void;
-  recordCustomerPurchase: (orderNumber?: string) => void;
   addToCart: (product: Product, quantity?: number, variantId?: string, size?: string) => void;
   updateCartQuantity: (productId: string, quantity: number, variantId?: string, size?: string) => void;
   removeFromCart: (productId: string, variantId?: string, size?: string) => void;
@@ -150,35 +147,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   });
 
-  // Customer purchase tracking for Order Tracking display
-  const [hasPurchased, setHasPurchased] = useState<boolean>(() => {
-    try {
-      if (localStorage.getItem("pfy_has_purchased") === "true") return true;
-      const orders = localStorage.getItem("pfy_customer_orders");
-      if (orders && JSON.parse(orders).length > 0) return true;
-      return false;
-    } catch {
-      return false;
-    }
-  });
-
-  const recordCustomerPurchase = (orderNumber?: string) => {
-    try {
-      localStorage.setItem("pfy_has_purchased", "true");
-      if (orderNumber) {
-        const existing = localStorage.getItem("pfy_customer_orders");
-        const list: string[] = existing ? JSON.parse(existing) : [];
-        if (!list.includes(orderNumber)) {
-          list.push(orderNumber);
-          localStorage.setItem("pfy_customer_orders", JSON.stringify(list));
-        }
-      }
-      setHasPurchased(true);
-    } catch (e) {
-      console.error("Error recording customer purchase:", e);
-    }
-  };
-
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -202,15 +170,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [wishlist]);
 
   // Fetch initial data
+  // The loading flag only gates the very first load. Background refreshes
+  // (after admin saves, revision polling) must NOT flip it, otherwise App
+  // swaps the admin portal for the spinner and its active tab resets.
+  const hasLoadedRef = useRef(false);
   const refreshData = async () => {
     try {
-      setIsLoading(true);
+      if (!hasLoadedRef.current) setIsLoading(true);
+      const ordersFetch = adminUser
+        ? fetch("/api/orders", {
+            headers: { Authorization: `Bearer ${localStorage.getItem("pfy_admin_token") || ""}` },
+          })
+        : Promise.resolve(null);
       const [prodsRes, catsRes, setRes, revsRes, ordersRes] = await Promise.all([
         fetch("/api/products?active_only=false"),
         fetch("/api/categories"),
         fetch("/api/settings"),
         fetch("/api/reviews"),
-        fetch("/api/orders"),
+        ordersFetch,
       ]);
 
       if (prodsRes.ok) {
@@ -229,19 +206,76 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const d = await revsRes.json();
         setReviews(d.reviews || []);
       }
-      if (ordersRes.ok) {
+      if (ordersRes && ordersRes.ok) {
         const d = await ordersRes.json();
         setOrders(d.orders || []);
       }
     } catch (err) {
       console.error("Error loading store data:", err);
     } finally {
-      setIsLoading(false);
+      if (!hasLoadedRef.current) {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     refreshData();
+  }, []);
+
+  // Orders are admin-only (they hold customer PII): load them on sign-in and
+  // drop them from memory when signed out.
+  useEffect(() => {
+    if (adminUser) {
+      refreshData();
+    } else {
+      setOrders([]);
+    }
+  }, [adminUser]);
+
+  // ---- Auto-sync: keep admin & storefront in sync (revision polling) ----
+  // The server bumps /api/revision on every store write. Each open tab polls it
+  // and re-fetches the store whenever it changes, so admin edits appear on the
+  // storefront and new customer orders appear in admin without a manual reload.
+  const revisionRef = useRef<number | null>(null);
+  const syncingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const checkForChanges = async () => {
+      if (syncingRef.current) return;
+      try {
+        syncingRef.current = true;
+        const res = await fetch("/api/revision");
+        if (!res.ok) return;
+        const data = await res.json();
+        const rev = data?.revision ?? null;
+        if (rev === null) return;
+        if (revisionRef.current !== null && rev !== revisionRef.current) {
+          await refreshData();
+        }
+        revisionRef.current = rev;
+      } catch (err) {
+        // Ignore transient network errors; next poll will retry.
+      } finally {
+        syncingRef.current = false;
+      }
+    };
+
+    refreshData()
+      .then(() => checkForChanges())
+      .catch(() => {});
+
+    const intervalId = window.setInterval(checkForChanges, 10000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") checkForChanges();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   const navigate = (route: AppRoute, params: RouteParams = {}) => {
@@ -268,6 +302,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Update the browser tab title for SEO + UX on every route change
+  useEffect(() => {
+    let title = "Perfect For You | Natural Hair Care, Skincare & Sets in Ghana";
+    if (currentRoute === "shop") {
+      title = "Shop | Perfect For You";
+    } else if (currentRoute === "about") {
+      title = "About Us | Perfect For You";
+    } else if (currentRoute === "contact") {
+      title = "Contact & Directions | Perfect For You";
+    } else if (currentRoute === "faq") {
+      title = "FAQ | Perfect For You";
+    } else if (currentRoute === "cart") {
+      title = "Your Cart | Perfect For You";
+    } else if (currentRoute === "checkout") {
+      title = "Checkout | Perfect For You";
+    } else if (currentRoute === "wishlist") {
+      title = "Wishlist | Perfect For You";
+    } else if (currentRoute === "admin") {
+      title = "Admin | Perfect For You";
+    } else if (currentRoute === "product" && routeParams.productId) {
+      const p = products.find((pr) => pr.id === routeParams.productId);
+      if (p) {
+        title = `${p.name} | Perfect For You`;
+      }
+    }
+    if (typeof document !== "undefined") {
+      document.title = title;
+    }
+  }, [currentRoute, routeParams.productId, products]);
 
   const addToCart = (
     product: Product,
@@ -366,6 +430,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const logoutAdmin = () => {
+    const token = localStorage.getItem("pfy_admin_token");
+    if (token) {
+      fetch("/api/admin/logout", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
     localStorage.removeItem("pfy_admin_token");
     localStorage.removeItem("pfy_admin_user");
     setAdminUser(null);
@@ -396,9 +467,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isAdminAuthenticated: !!adminUser,
         searchQuery,
         selectedCategory,
-        hasPurchased,
         navigate,
-        recordCustomerPurchase,
         addToCart,
         updateCartQuantity,
         removeFromCart,

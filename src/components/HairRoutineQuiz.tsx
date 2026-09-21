@@ -41,7 +41,7 @@ export const HairRoutineQuiz: React.FC = () => {
   const getRecommendation = (): RoutineResult => {
     if (hairGoal === "edges_growth") {
       return {
-        title: "Edge Recovery & Scalp Stimulation Ritual",
+        title: "Edge Recovery & Scalp Stimulation Routine",
         subtitle: "Botanical cold-pressed botanical herbs specifically formulated to awaken dormant follicles and retain fragile temples.",
         hairTypeBadge: `Tailored for ${hairTexture.toUpperCase()} & Sensitive Edges`,
         frequency: "3-4 times weekly + nightly satin protection",
@@ -66,13 +66,13 @@ export const HairRoutineQuiz: React.FC = () => {
             timing: "Weekly Washday",
           },
         ],
-        bundleSavings: "Save GH₵15 when purchased as a ritual",
+        bundleSavings: "Save GH₵15 when purchased as a routine",
       };
     }
 
     if (hairGoal === "moisture_retention") {
       return {
-        title: "Maximum Moisture & Length Retention (L.O.C) Ritual",
+        title: "Maximum Moisture & Length Retention (L.O.C) Routine",
         subtitle: "Liquid-Oil-Cream layering system for natural hair that drinks moisture and battles dryness.",
         hairTypeBadge: `Designed for ${hairTexture.toUpperCase()} & ${porosityOrScalp === "low" ? "Low Porosity" : "High Porosity"} Textures`,
         frequency: "Every 2-3 days for maximum softness",
@@ -170,7 +170,7 @@ export const HairRoutineQuiz: React.FC = () => {
                   Discover Your Custom Natural Hair Routine
                 </h2>
                 <p className="text-sm text-stone-600 max-w-lg mx-auto">
-                  No guesswork. Answer 3 quick questions to get a personalized Ghanaian botanical ritual matched to your exact curl texture and growth goals.
+                  No guesswork. Answer 3 quick questions to get a personalized Ghanaian botanical routine matched to your exact curl texture and growth goals.
                 </p>
               </div>
 
@@ -366,7 +366,7 @@ export const HairRoutineQuiz: React.FC = () => {
                   onClick={handleNext}
                   className="px-7 py-3 bg-[#1a3c34] hover:bg-[#2a4d45] text-white rounded-full text-xs font-bold uppercase tracking-wider inline-flex items-center space-x-2 transition-all shadow-sm active:scale-95"
                 >
-                  <span>{currentStep === 3 ? "Reveal My Tailored Ritual" : "Next Question"}</span>
+                  <span>{currentStep === 3 ? "Reveal My Tailored Routine" : "Next Question"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -401,7 +401,7 @@ export const HairRoutineQuiz: React.FC = () => {
                 </div>
               </div>
 
-              {/* 2-Column layout: Step-by-step ritual & Recommended bundle */}
+              {/* 2-Column layout: Step-by-step routine & Recommended bundle */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 {/* Left: Steps guide */}
                 <div className="lg:col-span-7 space-y-4">
@@ -496,7 +496,7 @@ export const HairRoutineQuiz: React.FC = () => {
                       ) : (
                         <>
                           <ShoppingBag className="w-4 h-4" />
-                          <span>Add Entire Ritual to Cart</span>
+                          <span>Add Entire Routine to Cart</span>
                         </>
                       )}
                     </button>

@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Trash2, ArrowRight, ShoppingBag, Truck } from "lucide-react";
+import { X, Trash2, ArrowRight, ShoppingBag } from "lucide-react";
 import { useStore } from "../context/StoreContext.tsx";
 import { formatPrice } from "../utils/format.ts";
 
@@ -12,17 +12,9 @@ export const CartDrawer: React.FC = () => {
     removeFromCart,
     cartSubtotal,
     navigate,
-    settings,
   } = useStore();
 
   if (!isCartOpen) return null;
-
-  const freeShippingThreshold = settings?.free_delivery_threshold || 300;
-  const amountToFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
-  const freeShippingProgress = Math.min(
-    100,
-    (cartSubtotal / freeShippingThreshold) * 100
-  );
 
   const handleCheckout = () => {
     setIsCartOpen(false);
@@ -53,29 +45,6 @@ export const CartDrawer: React.FC = () => {
             >
               <X className="w-5 h-5" />
             </button>
-          </div>
-
-          {/* Free Shipping Progress Indicator */}
-          <div className="bg-[#eae7e0] px-5 py-3 border-b border-black/5 text-xs">
-            <div className="flex items-center space-x-2 text-[#1a3c34] font-medium mb-1.5">
-              <Truck className="w-3.5 h-3.5 text-[#5a5a40]" />
-              {amountToFreeShipping > 0 ? (
-                <span>
-                  Add <strong className="font-bold">{formatPrice(amountToFreeShipping)}</strong> more for{" "}
-                  <strong className="text-[#1a3c34]">FREE delivery</strong> in Accra!
-                </span>
-              ) : (
-                <span className="text-[#1a3c34] font-semibold">
-                  🎉 Congratulations! You unlocked FREE delivery in Accra!
-                </span>
-              )}
-            </div>
-            <div className="w-full bg-[#5a5a40]/20 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-[#1a3c34] h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${freeShippingProgress}%` }}
-              />
-            </div>
           </div>
 
           {/* Cart Item List */}
@@ -204,8 +173,8 @@ export const CartDrawer: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex justify-between text-[#5a5a40]">
-                  <span>Estimated Delivery</span>
-                  <span>Calculated at checkout</span>
+                  <span>Delivery</span>
+                  <span>Arranged after payment</span>
                 </div>
               </div>
 

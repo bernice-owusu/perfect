@@ -15,6 +15,6 @@ View your app in AI Studio: https://ai.studio/apps/aabf77f5-626f-43fb-920f-dc9e4
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Copy `.env.example` to `.env` and fill in the values (`DATABASE_URL`, Paystack keys)
 3. Run the app:
    `npm run dev`

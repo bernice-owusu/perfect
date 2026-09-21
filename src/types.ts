@@ -25,6 +25,7 @@ export interface Product {
   how_to_use?: string;
   is_featured: boolean;
   is_active: boolean;
+  is_set?: boolean;
   rating?: number;
   reviews_count?: number;
   created_at: string;
@@ -89,10 +90,12 @@ export interface Order {
   total: number;
   payment_status: PaymentStatus;
   order_status: OrderStatus;
-  payment_method: 'paystack' | 'momo' | 'card';
+  payment_method: 'paystack' | 'momo' | 'card' | 'cash_on_delivery';
   paystack_reference?: string;
   created_at: string;
   updated_at?: string;
+  delivery_contact_status?: "Not Contacted" | "Contacted" | "Delivery Arranged" | "Delivered";
+  delivery_note?: string;
 }
 
 export interface DeliveryZone {
@@ -111,7 +114,6 @@ export interface StoreSettings {
   address: string;
   currency: string;
   announcement_bar?: string;
-  free_delivery_threshold: number;
   delivery_zones: DeliveryZone[];
   paystack_public_key: string;
   paystack_test_mode: boolean;

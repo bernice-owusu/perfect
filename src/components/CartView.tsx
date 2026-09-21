@@ -1,5 +1,5 @@
 import React from "react";
-import { Trash2, ArrowRight, ShoppingBag, Truck, ArrowLeft } from "lucide-react";
+import { Trash2, ArrowRight, ShoppingBag, ArrowLeft } from "lucide-react";
 import { useStore } from "../context/StoreContext.tsx";
 import { formatPrice } from "../utils/format.ts";
 
@@ -11,11 +11,7 @@ export const CartView: React.FC = () => {
     clearCart,
     cartSubtotal,
     navigate,
-    settings,
   } = useStore();
-
-  const freeShippingThreshold = settings?.free_delivery_threshold || 300;
-  const amountToFreeShipping = Math.max(0, freeShippingThreshold - cartSubtotal);
 
   if (cart.length === 0) {
     return (
@@ -64,20 +60,6 @@ export const CartView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         {/* Items List */}
         <div className="lg:col-span-8 space-y-4">
-          {/* Free Shipping Alert */}
-          <div className="bg-[#eae7e0] border border-black/5 rounded-2xl p-4 flex items-center space-x-3 text-xs text-[#1a3c34]">
-            <Truck className="w-5 h-5 text-[#5a5a40] shrink-0" />
-            {amountToFreeShipping > 0 ? (
-              <span>
-                Add <strong>{formatPrice(amountToFreeShipping)}</strong> more to qualify for <strong>FREE delivery</strong> in Accra!
-              </span>
-            ) : (
-              <span className="font-semibold text-[#1a3c34]">
-                🎉 You have qualified for FREE delivery in Accra!
-              </span>
-            )}
-          </div>
-
           <div className="bg-white rounded-3xl border border-black/5 divide-y divide-stone-100 overflow-hidden card-shadow">
             {cart.map((item, idx) => (
               <div
@@ -191,7 +173,7 @@ export const CartView: React.FC = () => {
               </div>
               <div className="flex justify-between text-xs text-[#5a5a40]">
                 <span>Delivery</span>
-                <span>Calculated at next step</span>
+                <span>Arranged after payment</span>
               </div>
             </div>
 

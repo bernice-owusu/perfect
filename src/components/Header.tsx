@@ -11,13 +11,13 @@ import {
   ShoppingBag,
   MessageCircle,
   HeartHandshake,
-  Star,
-  Ghost,
   CheckCircle2,
+  Music2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../context/StoreContext.tsx";
 import { BrandLogo } from "./BrandLogo.tsx";
+import { formatPrice } from "../utils/format.ts";
 
 export const Header: React.FC = () => {
   const {
@@ -31,7 +31,6 @@ export const Header: React.FC = () => {
     selectedCategory,
     setSelectedCategory,
     adminUser,
-    hasPurchased,
     settings,
   } = useStore();
 
@@ -126,6 +125,7 @@ export const Header: React.FC = () => {
         skincare: "skincare-section",
         slippers: "slippers-section",
         bags: "bags-section",
+        accessories: "accessories-section",
       };
       const sectionId = sectionMap[catSlug];
       if (sectionId) {
@@ -149,7 +149,7 @@ export const Header: React.FC = () => {
       setTimeout(() => {
         const el = document.getElementById(sectionId);
         if (el) {
-          const yOffset = -85;
+          const yOffset = -120;
           const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: "smooth" });
         }
@@ -157,7 +157,7 @@ export const Header: React.FC = () => {
     } else {
       const el = document.getElementById(sectionId);
       if (el) {
-        const yOffset = -85;
+        const yOffset = -120;
         const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
         window.scrollTo({ top: y, behavior: "smooth" });
       }
@@ -173,13 +173,21 @@ export const Header: React.FC = () => {
   };
 
   const whatsappPhone = settings?.whatsapp || "233544590749";
-  const snapchatUrl = settings?.social_links?.snapchat || "https://www.snapchat.com/t/vjlTm2Px";
+  const snapchatUrl = settings?.social_links?.snapchat || "https://snapchat.com/t/3UgHdBXR";
+  const tiktokUrl = settings?.social_links?.tiktok || "https://www.tiktok.com/@perfect_for_you2";
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-black/5 transition-all">
+      {/* Announcement Bar (editable from Admin Settings) */}
+      {settings?.announcement_bar && (
+        <div className="bg-[#1a3c34] text-white text-center text-xs font-medium py-2 px-4 leading-relaxed">
+          {settings.announcement_bar}
+        </div>
+      )}
+
       {/* Main Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-18 gap-2 sm:gap-6">
+        <div className="flex items-center justify-between h-20 sm:h-28 gap-2 sm:gap-6">
           {/* Left section: Hamburger button (on phone) + Brand Logo Icon */}
           <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             {/* Mobile Hamburger Toggle Button - opens 3/4 left drawer */}
@@ -196,11 +204,11 @@ export const Header: React.FC = () => {
             <button
               id="brand-logo-btn"
               onClick={() => navigate("home")}
-              className="flex items-center justify-center p-1 rounded-xl group transition-transform hover:scale-105 shrink-0"
+              className="flex items-center justify-center p-1 rounded-xl group transition-transform hover:scale-105"
               aria-label="Perfect For You Home"
               title="Perfect For You"
             >
-              <BrandLogo variant="mark" size="md" />
+              <BrandLogo variant="mark" size="full" />
             </button>
           </div>
 
@@ -235,23 +243,6 @@ export const Header: React.FC = () => {
               }`}
             >
               Shop All
-            </button>
-
-            <button
-              id="nav-quiz-btn"
-              onClick={() => handleSectionJump("routine-quiz-section")}
-              className="px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/60 flex items-center space-x-1"
-            >
-              <Sparkles className="w-3 h-3 text-emerald-600" />
-              <span>Routine Quiz</span>
-            </button>
-
-            <button
-              id="nav-snapchat-btn"
-              onClick={() => handleSectionJump("snapchat-stories-section")}
-              className="px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
-            >
-              Snapchat Stories
             </button>
 
             <button
@@ -302,20 +293,17 @@ export const Header: React.FC = () => {
               Bags
             </button>
 
-            {hasPurchased && (
-              <button
-                id="nav-tracking-btn"
-                onClick={() => navigate("order-tracking")}
-                className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold flex items-center space-x-1.5 shrink-0 ${
-                  currentRoute === "order-tracking"
-                    ? "bg-[#1a3c34] text-white shadow-xs"
-                    : "text-[#5a5a40] hover:text-[#1a3c34] hover:bg-black/5 font-bold"
-                }`}
-              >
-                <Truck className="w-3.5 h-3.5" />
-                <span>Track Order</span>
-              </button>
-            )}
+            <button
+              id="nav-about-btn"
+              onClick={() => navigate("about")}
+              className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 ${
+                currentRoute === "about"
+                  ? "bg-[#1a3c34] text-white shadow-xs"
+                  : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
+              }`}
+            >
+              About
+            </button>
           </nav>
 
           {/* Right Action Icons & Search */}
@@ -416,12 +404,12 @@ export const Header: React.FC = () => {
                   animate={{ x: 0 }}
                   exit={{ x: "-100%" }}
                   transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                  className="fixed top-0 bottom-0 left-0 w-[75vw] max-w-[340px] bg-[#faf9f6] h-screen h-[100dvh] shadow-[15px_0_40px_rgba(0,0,0,0.35)] flex flex-col z-[101] overflow-hidden"
+                  className="fixed top-0 bottom-0 left-0 w-[75vw] max-w-[340px] bg-[#faf9f6] h-dvh shadow-[15px_0_40px_rgba(0,0,0,0.35)] flex flex-col z-[101] overflow-hidden"
                 >
                   {/* Drawer Header with Brand Emblem and Close Button */}
                   <div className="p-4 border-b border-black/5 flex items-center justify-between bg-white shrink-0">
                     <div className="flex items-center space-x-2.5">
-                      <BrandLogo variant="mark" size="sm" />
+                      <BrandLogo variant="mark" size="lg" />
                       <div>
                         <span className="font-serif text-sm sm:text-base font-bold text-[#1a3c34] tracking-wide block leading-tight">
                           PERFECT FOR YOU
@@ -567,101 +555,54 @@ export const Header: React.FC = () => {
                       <span className="text-[11px] text-[#5a5a40]">Totes &amp; Carry</span>
                     </button>
 
-                    <div className="pt-2.5 pb-1">
-                      <div className="h-px bg-black/5" />
-                    </div>
+<div className="pt-2.5 pb-1">
+  <div className="h-px bg-black/5" />
+</div>
 
-                    <p className="px-2.5 text-[10px] uppercase font-bold tracking-[0.2em] text-[#5a5a40] mb-2">
-                      Interactive &amp; Discover
-                    </p>
+<p className="px-2.5 text-[10px] uppercase font-bold tracking-[0.2em] text-[#5a5a40] mb-2">
+  Discover
+</p>
 
-                    <button
-                      id="drawer-nav-quiz-btn"
-                      onClick={() => handleSectionJump("routine-quiz-section")}
-                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold text-emerald-950 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/50 transition-all"
-                    >
-                      <div className="flex items-center space-x-2.5">
-                        <Sparkles className="w-4 h-4 text-emerald-600" />
-                        <span>Match My Hair Routine</span>
-                      </div>
-                      <span className="text-[10px] uppercase font-bold text-emerald-700 bg-white px-2 py-0.5 rounded shadow-2xs">
-                        Quiz
-                      </span>
-                    </button>
-
-                    <button
-                      id="drawer-nav-snapchat-btn"
-                      onClick={() => handleSectionJump("snapchat-stories-section")}
+<button
+                      id="drawer-nav-lifestyle-btn"
+                      onClick={() => handleSectionJump("lifestyle-section")}
                       className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold text-[#1a1a1a] hover:bg-black/5 transition-all"
                     >
                       <div className="flex items-center space-x-2.5">
-                        <Ghost className="w-4 h-4 text-amber-500" />
-                        <span>Daily Snapchat Stories</span>
+                        <ShoppingBag className="w-4 h-4 text-[#1a3c34]" />
+                        <span>Slippers & Bags</span>
                       </div>
-                      <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-bold">Watch</span>
+                      <span className="text-[10px] text-[#5a5a40] font-bold">Lifestyle</span>
                     </button>
 
-                    <button
-                      id="drawer-nav-results-btn"
-                      onClick={() => handleSectionJump("results-comparison-section")}
-                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold text-[#1a1a1a] hover:bg-black/5 transition-all"
-                    >
-                      <div className="flex items-center space-x-2.5">
-                        <CheckCircle2 className="w-4 h-4 text-[#1a3c34]" />
-                        <span>Before &amp; After Proof</span>
-                      </div>
-                      <span className="text-[10px] text-[#5a5a40] font-bold">Compare</span>
-                    </button>
-
-                    <button
-                      id="drawer-nav-story-btn"
-                      onClick={() => handleSectionJump("story-section")}
-                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold text-[#1a1a1a] hover:bg-black/5 transition-all"
-                    >
-                      <div className="flex items-center space-x-2.5">
-                        <HeartHandshake className="w-4 h-4 text-[#1a3c34]" />
-                        <span>Our Story &amp; Roots</span>
-                      </div>
-                      <span className="text-[11px] text-[#5a5a40]">Accra Heritage</span>
-                    </button>
-
-                    <button
-                      id="drawer-nav-ritual-btn"
-                      onClick={() => handleSectionJump("ritual-section")}
-                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold text-[#1a1a1a] hover:bg-black/5 transition-all"
-                    >
-                      <div className="flex items-center space-x-2.5">
-                        <Star className="w-4 h-4 text-[#1a3c34]" />
-                        <span>The Daily Ritual</span>
-                      </div>
-                      <span className="text-[11px] text-[#5a5a40]">3-Step Guide</span>
-                    </button>
-
-                    <div className="pt-2.5 pb-1">
-                      <div className="h-px bg-black/5" />
-                    </div>
-
-                    <p className="px-2.5 text-[10px] uppercase font-bold tracking-[0.2em] text-[#5a5a40] mb-2">
-                      Orders &amp; Assistance
-                    </p>
-
-                    <button
+<button
+  id="drawer-nav-about-btn"
                       onClick={() => {
                         setMobileMenuOpen(false);
-                        navigate("order-tracking");
+                        navigate("about");
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold transition-all ${
-                        currentRoute === "order-tracking"
+                        currentRoute === "about"
                           ? "bg-[#1a3c34] text-white shadow-xs"
                           : "text-[#1a1a1a] hover:bg-black/5"
                       }`}
                     >
                       <div className="flex items-center space-x-2.5">
-                        <Truck className="w-4 h-4 text-[#1a3c34]" />
-                        <span>Track Order</span>
+                        <HeartHandshake className="w-4 h-4 text-[#1a3c34]" />
+                        <span>About Perfect For You</span>
                       </div>
-                      <span className="text-[11px] text-[#5a5a40]">Live status</span>
+                      <span className="text-[11px] text-[#5a5a40]">Contact &amp; Info</span>
                     </button>
+
+                    
+
+                    <div className="pt-2.5 pb-1">
+                      <div className="h-px bg-black/5" />
+                    </div>
+
+<p className="px-2.5 text-[10px] uppercase font-bold tracking-[0.2em] text-[#5a5a40] mb-2">
+                      Orders & Assistance
+                    </p>
 
                     <button
                       onClick={() => {
@@ -706,18 +647,37 @@ export const Header: React.FC = () => {
 
                     {/* Snapchat */}
                     {snapchatUrl && (
+<a
+                      href={snapchatUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold bg-yellow-400/20 text-stone-900 hover:bg-yellow-400/30 transition-all mt-1"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <MessageCircle className="w-4 h-4 text-stone-900 fill-stone-900" />
+                        <span>Snapchat</span>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-800 bg-white/80 px-1.5 py-0.5 rounded">
+                        Follow
+                      </span>
+                    </a>
+                    )}
+
+                    {/* TikTok */}
+                    {tiktokUrl && (
                       <a
-                        href={snapchatUrl}
+                        href={tiktokUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold bg-yellow-400/20 text-stone-900 hover:bg-yellow-400/30 transition-all mt-1"
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold bg-black text-white hover:bg-[#2a2a2a] transition-all mt-1"
                       >
                         <div className="flex items-center space-x-2.5">
-                          <Ghost className="w-4 h-4 text-stone-900 fill-stone-900" />
-                          <span>Snapchat</span>
+                          <Music2 className="w-4 h-4 text-emerald-300" />
+                          <span>TikTok</span>
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-stone-800 bg-white/80 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white bg-white/10 px-1.5 py-0.5 rounded border border-white/15">
                           Follow
                         </span>
                       </a>
@@ -728,7 +688,7 @@ export const Header: React.FC = () => {
                   <div className="p-3.5 bg-white border-t border-black/5 text-center space-y-2 shrink-0">
                     <div className="flex items-center justify-center space-x-1.5 text-[11px] text-[#1a3c34] font-semibold">
                       <Truck className="w-3.5 h-3.5 shrink-0" />
-                      <span>FREE delivery in Accra over GH₵200</span>
+                      <span>Delivery arranged within 24 hours</span>
                     </div>
                   </div>
                 </motion.div>

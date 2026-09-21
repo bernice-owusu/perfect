@@ -10,7 +10,7 @@ interface BeforeAfterItem {
   id: string;
   title: string;
   timeline: string;
-  ritualUsed: string;
+  routineUsed: string;
   beforeImg: string;
   afterImg: string;
   beforeLabel: string;
@@ -49,9 +49,9 @@ export const BeforeAfterSlider: React.FC = () => {
       id: "case-edges",
       title: "Edge Line Regrowth & Breakage Halt",
       timeline: "30 Days of Consistency",
-      ritualUsed: "Nourishing Growth Oil + Ayurvedic Hair Mask",
+      routineUsed: "Nourishing Growth Oil + Ayurvedic Hair Mask",
       beforeImg: "/images/thin_edges.png",
-      afterImg: "/images/pfy_model_duo.jpg",
+      afterImg: "/images/pfy_model_duo.jpeg",
       beforeLabel: "Day 1: Thinning Edges & Shedding",
       afterLabel: "Day 30: Full Temples & Stronger Root Anchor",
       quote:
@@ -63,9 +63,9 @@ export const BeforeAfterSlider: React.FC = () => {
       id: "case-moisture",
       title: "4C Coils 72-Hour Moisture & Stretch",
       timeline: "After 2 Washday Cycles",
-      ritualUsed: "Hydration Hair Mist + Whipped Shea Butter",
+      routineUsed: "Hydration Hair Mist + Whipped Shea Butter",
       beforeImg: "/images/tangled.png",
-      afterImg: "/images/pfy_model_collection.jpg",
+      afterImg: "/images/pyf_model_collection.jpeg",
       beforeLabel: "Dry, Brittle & Crunchy Ends",
       afterLabel: "Juicy, Pliable & Deeply Hydrated Coils",
       quote:
@@ -204,7 +204,7 @@ export const BeforeAfterSlider: React.FC = () => {
               </h3>
 
               <p className="text-xs text-stone-600">
-                <strong>Formula:</strong> {current.ritualUsed}
+                <strong>Formula:</strong> {current.routineUsed}
               </p>
             </div>
 

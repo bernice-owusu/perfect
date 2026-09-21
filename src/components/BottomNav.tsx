@@ -1,9 +1,9 @@
 import React from "react";
-import { Home, ShoppingBag, Heart, ShoppingCart, Truck } from "lucide-react";
+import { Home, ShoppingBag, Heart, ShoppingCart } from "lucide-react";
 import { useStore, AppRoute } from "../context/StoreContext.tsx";
 
 export const BottomNav: React.FC = () => {
-  const { currentRoute, navigate, cartCount, wishlist, hasPurchased } = useStore();
+  const { currentRoute, navigate, cartCount, wishlist } = useStore();
 
   if (currentRoute === "admin") return null;
 
@@ -12,9 +12,6 @@ export const BottomNav: React.FC = () => {
     { label: "Shop", route: "shop", icon: <ShoppingBag className="w-5 h-5" /> },
     { label: "Wishlist", route: "wishlist", icon: <Heart className="w-5 h-5" />, badge: wishlist.length },
     { label: "Cart", route: "cart", icon: <ShoppingCart className="w-5 h-5" />, badge: cartCount },
-    ...(hasPurchased
-      ? [{ label: "Track", route: "order-tracking" as AppRoute, icon: <Truck className="w-5 h-5" /> }]
-      : []),
   ];
 
   return (

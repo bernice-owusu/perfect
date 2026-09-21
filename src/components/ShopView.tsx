@@ -25,12 +25,18 @@ export const ShopView: React.FC = () => {
       if (!p.is_active) return false;
 
       // Category filter
-      if (selectedCategory !== "all") {
-        const isMatch =
-          p.category_id === selectedCategory ||
-          p.slug.includes(selectedCategory) ||
-          p.category_name?.toLowerCase() === selectedCategory.toLowerCase();
-        if (!isMatch) return false;
+      if (selectedCategory === "sets") {
+        if (!p.is_set) return false;
+      } else {
+        // Regular product views never include sets
+        if (p.is_set) return false;
+        if (selectedCategory !== "all") {
+          const isMatch =
+            p.category_id === selectedCategory ||
+            p.slug.includes(selectedCategory) ||
+            p.category_name?.toLowerCase() === selectedCategory.toLowerCase();
+          if (!isMatch) return false;
+        }
       }
 
       // Search query
@@ -65,9 +71,16 @@ export const ShopView: React.FC = () => {
     });
   }, [products, selectedCategory, searchQuery, priceFilter, inStockOnly, sortBy]);
 
-  const activeCategoryObj = categories.find(
-    (c) => c.slug === selectedCategory || c.id === selectedCategory
-  );
+  const activeCategoryObj =
+    selectedCategory === "sets"
+      ? {
+          name: "Signature Sets",
+          description:
+            "Complete bundles put together for you — ready to enjoy, delivered as one set.",
+        }
+      : categories.find(
+          (c) => c.slug === selectedCategory || c.id === selectedCategory
+        );
 
   const clearAllFilters = () => {
     setSelectedCategory("all");
@@ -117,7 +130,19 @@ export const ShopView: React.FC = () => {
               : "bg-white text-stone-700 hover:bg-[#f9f9f7] border border-black/5"
           }`}
         >
-          All Products ({products.filter((p) => p.is_active).length})
+          All Products ({products.filter((p) => p.is_active && !p.is_set).length})
+        </button>
+
+        <button
+          id="shop-tab-sets"
+          onClick={() => setSelectedCategory("sets")}
+          className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
+            selectedCategory === "sets"
+              ? "bg-[#1a3c34] text-white shadow-xs"
+              : "bg-white text-stone-700 hover:bg-[#f9f9f7] border border-black/5"
+          }`}
+        >
+          Sets ({products.filter((p) => p.is_active && p.is_set).length})
         </button>
 
         {categories.map((cat) => (

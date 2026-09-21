@@ -1,10 +1,10 @@
 import React from "react";
-import { MessageCircle, ShieldCheck, Heart, ArrowUpRight, Ghost } from "lucide-react";
+import { MessageCircle, ShieldCheck, Heart, ArrowUpRight, Ghost, Music2 } from "lucide-react";
 import { useStore } from "../context/StoreContext.tsx";
 import { BrandLogo } from "./BrandLogo.tsx";
 
 export const Footer: React.FC = () => {
-  const { navigate, setSelectedCategory, settings, hasPurchased } = useStore();
+  const { navigate, setSelectedCategory, settings } = useStore();
 
   const handleCategoryClick = (catSlug: string) => {
     setSelectedCategory(catSlug);
@@ -13,7 +13,8 @@ export const Footer: React.FC = () => {
   };
 
   const phone = settings?.whatsapp || "233544590749";
-  const snapchatUrl = settings?.social_links?.snapchat || "https://www.snapchat.com/t/vjlTm2Px";
+  const snapchatUrl = settings?.social_links?.snapchat || "https://snapchat.com/t/3UgHdBXR";
+  const tiktokUrl = settings?.social_links?.tiktok || "https://www.tiktok.com/@perfect_for_you2";
 
   return (
     <footer className="bg-[#1a3c34] text-white pt-16 pb-24 md:pb-12 border-t border-black/10">
@@ -29,11 +30,11 @@ export const Footer: React.FC = () => {
               className="text-left group transition-transform hover:opacity-95"
               aria-label="Perfect For You Home"
             >
-              <BrandLogo variant="horizontal" size="md" inverted={true} />
+              <BrandLogo variant="mark" size="full" inverted={true} />
             </button>
 
             <p className="text-stone-300 text-xs sm:text-sm leading-relaxed max-w-sm">
-              Beauty. Confidence. Simplicity. We bring authentic herbal hair rituals, nourishing barrier skincare, and comfortable footwear &amp; bags directly to your doorstep in Ghana.
+              Beauty. Confidence. Simplicity. We bring authentic herbal hair care, nourishing barrier skincare, and comfortable footwear &amp; bags directly to your doorstep in Ghana.
             </p>
 
             <div className="pt-2 flex flex-wrap gap-2.5 items-center">
@@ -58,6 +59,18 @@ export const Footer: React.FC = () => {
                   <span>Snapchat</span>
                 </a>
               )}
+
+              {tiktokUrl && (
+                <a
+                  href={tiktokUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-black hover:bg-[#2a2a2a] text-white text-xs font-semibold transition-colors shadow-xs"
+                >
+                  <Music2 className="w-4 h-4 text-emerald-300" />
+                  <span>TikTok</span>
+                </a>
+              )}
             </div>
           </div>
 
@@ -72,7 +85,7 @@ export const Footer: React.FC = () => {
                   onClick={() => handleCategoryClick("hair")}
                   className="hover:text-white transition-colors"
                 >
-                  Hair Care Rituals
+                  Hair Care Routines
                 </button>
               </li>
               <li>
@@ -101,6 +114,14 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <button
+                  onClick={() => handleCategoryClick("accessories")}
+                  className="hover:text-white transition-colors"
+                >
+                  Beauty Accessories
+                </button>
+              </li>
+              <li>
+                <button
                   onClick={() => {
                     setSelectedCategory("all");
                     navigate("shop");
@@ -120,19 +141,17 @@ export const Footer: React.FC = () => {
               Customer Help
             </h4>
             <ul className="space-y-2 text-xs text-stone-300">
-              {hasPurchased && (
-                <li>
-                  <button
-                    onClick={() => {
-                      navigate("order-tracking");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="hover:text-white transition-colors"
-                  >
-                    Track My Order
-                  </button>
-                </li>
-              )}
+              <li>
+                <button
+                  onClick={() => {
+                    navigate("about");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="hover:text-white transition-colors"
+                >
+                  About Perfect For You
+                </button>
+              </li>
               <li>
                 <button
                   onClick={() => {
@@ -175,10 +194,10 @@ export const Footer: React.FC = () => {
               Ghana Dispatch
             </h4>
             <p className="text-xs text-stone-300 leading-relaxed">
-              Order dispatch hub located in East Legon, Accra. Express delivery across Greater Accra, Ashanti, Western &amp; all regions.
+              Order dispatch hub located in Achimota (St. John's Overhead), Accra. Express delivery across Greater Accra, Ashanti, Western &amp; all regions.
             </p>
             <p className="text-[11px] text-emerald-200/90 pt-1">
-              Need assistance? Chat directly on WhatsApp (+233 54 459 0749) or add us on Snapchat.
+              Need assistance? Chat directly on WhatsApp (+233 54 459 0749), call 053 805 5631, or add us on Snapchat.
             </p>
           </div>
         </div>

@@ -25,6 +25,7 @@ export const ProductDetailView: React.FC = () => {
     isInWishlist,
     toggleWishlist,
     settings,
+    reviews,
   } = useStore();
 
   const product = products.find(
@@ -84,12 +85,12 @@ export const ProductDetailView: React.FC = () => {
   )}`;
 
   const relatedProducts = products
-    .filter((p) => p.category_id === product.category_id && p.id !== product.id && p.is_active)
+    .filter((p) => p.category_id === product.category_id && p.id !== product.id && p.is_active && !p.is_set)
     .slice(0, 4);
 
   // Dynamic Bundle Companion Recommendation
   const bundleCompanion = products.find(
-    (p) => p.id !== product.id && p.is_active && (
+    (p) => p.id !== product.id && p.is_active && !p.is_set && (
       (product.category_id === "cat-hair" && p.category_id === "cat-hair") ||
       (product.category_id === "cat-skincare" && p.category_id === "cat-skincare") ||
       (product.category_id === "cat-slippers" && p.category_id === "cat-bags") ||
@@ -106,6 +107,8 @@ export const ProductDetailView: React.FC = () => {
     setBundleAdded(true);
     setTimeout(() => setBundleAdded(false), 2200);
   };
+
+  const productReviews = reviews.filter((r) => r.product_id === product.id);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
@@ -203,9 +206,16 @@ export const ProductDetailView: React.FC = () => {
           <div>
             {/* Category tag & rating */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#5a5a40]">
-                {product.category_name}
-              </span>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#5a5a40]">
+                  {product.category_name}
+                </span>
+                {product.is_set && (
+                  <span className="bg-[#1a3c34] text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Set
+                  </span>
+                )}
+              </div>
               <div className="flex items-center space-x-1.5 text-xs text-amber-500">
                 <div className="flex">
                   {[...Array(5)].map((_, i) => (
@@ -230,7 +240,7 @@ export const ProductDetailView: React.FC = () => {
             </h1>
 
             {/* Price */}
-            <div className="flex items-baseline space-x-3 mb-4">
+            <div className="flex items-baseline space-x-3 mb-4 flex-wrap gap-y-1.5">
               <span className="text-2xl sm:text-3xl font-bold text-[#1a3c34]">
                 {formatPrice(product.price)}
               </span>
@@ -358,12 +368,12 @@ export const ProductDetailView: React.FC = () => {
             </div>
           </div>
 
-          {/* Authentic Brand Ritual Guidance Card */}
+          {/* Authentic Brand Routine Guidance Card */}
           {product.name.toLowerCase().includes("hair oil") && (
             <div className="bg-[#1a3c34]/5 border border-[#1a3c34]/15 rounded-2xl p-4 space-y-2 text-xs">
               <div className="flex items-center space-x-2 text-[#1a3c34] font-bold uppercase tracking-wider text-[11px]">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Brand Ritual: Where Does Oil Fall?</span>
+                <span>Brand Routine: Where Does Oil Fall?</span>
               </div>
               <div className="space-y-1 text-stone-700">
                 <p className="font-semibold text-rose-700 text-[11px]">
@@ -380,7 +390,7 @@ export const ProductDetailView: React.FC = () => {
             <div className="bg-[#1a3c34]/5 border border-[#1a3c34]/15 rounded-2xl p-4 space-y-2 text-xs">
               <div className="flex items-center space-x-2 text-[#1a3c34] font-bold uppercase tracking-wider text-[11px]">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Brand Ritual: Hydration vs. Moisturization</span>
+                <span>Brand Routine: Hydration vs. Moisturization</span>
               </div>
               <p className="text-stone-800 leading-relaxed">
                 <strong>Moisturization = Seals The Water:</strong> Butters and creams do <strong className="underline">not</strong> add water—they trap and lock hydration already inside your hair to keep it soft and resilient for days.
@@ -392,7 +402,7 @@ export const ProductDetailView: React.FC = () => {
             <div className="bg-[#1a3c34]/5 border border-[#1a3c34]/15 rounded-2xl p-4 space-y-2 text-xs">
               <div className="flex items-center space-x-2 text-[#1a3c34] font-bold uppercase tracking-wider text-[11px]">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Brand Ritual: Healthy Hair, Happy Skin — naturally</span>
+                <span>Brand Routine: Healthy Hair, Happy Skin — naturally</span>
               </div>
               <p className="text-stone-800 leading-relaxed">
                 <strong>100% Chemical-Free Ayurvedic Treatment:</strong> Amla, bhringraj, and fenugreek deliver essential minerals directly to your roots, reduce split ends, and balance your scalp.
@@ -602,6 +612,74 @@ export const ProductDetailView: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CUSTOMER REVIEWS */}
+      <div className="mt-16 sm:mt-24 pt-12 border-t border-black/5">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-8">
+          <div>
+            <span className="text-xs uppercase font-bold tracking-[0.2em] text-[#5a5a40] block mb-1">
+              Social Proof
+            </span>
+            <h2 className="font-serif text-2xl sm:text-3xl text-[#1a3c34] font-medium">
+              Customer Reviews
+            </h2>
+          </div>
+          <div className="flex items-center space-x-1.5 text-sm">
+            <div className="flex text-amber-400">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+              ))}
+            </div>
+            <span className="text-stone-600 font-semibold">
+              {product.rating ? product.rating.toFixed(1) : "5.0"}
+            </span>
+            <span className="text-stone-400">({product.reviews_count || productReviews.length} reviews)</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Review list */}
+          <div className="lg:col-span-12 space-y-4">
+            {productReviews.length === 0 ? (
+              <div className="bg-[#f9f9f7] border border-black/5 rounded-2xl p-8 text-center text-sm text-stone-500">
+                No reviews yet for this product. Reviews are shared by our customers via WhatsApp.
+              </div>
+            ) : (
+              productReviews.map((rev) => (
+                <div key={rev.id} className="bg-white rounded-2xl border border-stone-200/80 p-5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-9 h-9 rounded-full bg-[#1a3c34]/10 text-[#1a3c34] flex items-center justify-center font-serif font-bold text-sm">
+                        {rev.author.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-stone-900 text-sm block">
+                          {rev.author}
+                        </span>
+                        <span className="text-[11px] text-stone-400 block">
+                          {rev.location} {rev.verified_purchase ? "• Verified purchase" : ""}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex text-amber-400">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3.5 h-3.5 ${i < rev.rating ? "fill-amber-400 text-amber-400" : "text-stone-200"}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-stone-400">{rev.date}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-stone-700 leading-relaxed">{rev.comment}</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

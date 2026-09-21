@@ -21,6 +21,23 @@ body {
   color: #1a1a1a;
 }
 
+/* Every clickable control shows a pointer hand */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+a,
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 .card-shadow {
   box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.05);
 }
@@ -30,5 +47,22 @@ body {
 }
 .card-shadow-hover:hover {
   box-shadow: 0px 8px 30px rgba(26, 60, 52, 0.08);
+}
+
+/* Hide scrollbars for horizontal scroll rows while keeping them scrollable */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 

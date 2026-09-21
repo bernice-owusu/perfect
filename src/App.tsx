@@ -11,8 +11,8 @@ import { ProductDetailView } from "./components/ProductDetailView.tsx";
 import { CartView } from "./components/CartView.tsx";
 import { CheckoutView } from "./components/CheckoutView.tsx";
 import { OrderConfirmationView } from "./components/OrderConfirmationView.tsx";
-import { OrderTrackingView } from "./components/OrderTrackingView.tsx";
 import { WishlistView } from "./components/WishlistView.tsx";
+import { AboutView } from "./components/AboutView.tsx";
 import { AdminPortal } from "./components/admin/AdminPortal.tsx";
 
 const StoreApp: React.FC = () => {
@@ -51,8 +51,8 @@ const StoreApp: React.FC = () => {
         {currentRoute === "cart" && <CartView />}
         {currentRoute === "checkout" && <CheckoutView />}
         {currentRoute === "order-confirmation" && <OrderConfirmationView />}
-        {currentRoute === "order-tracking" && <OrderTrackingView />}
         {currentRoute === "wishlist" && <WishlistView />}
+        {currentRoute === "about" && <AboutView />}
       </main>
 
       {/* Global Footer */}

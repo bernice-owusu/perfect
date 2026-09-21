@@ -72,6 +72,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Badges container */}
         <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 flex flex-col gap-1 sm:gap-1.5 z-10">
+          {product.is_set && (
+            <span className="bg-[#1a3c34] text-white text-[9px] sm:text-[10px] font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full uppercase tracking-wider shadow-xs">
+              Set
+            </span>
+          )}
           {discountPercent && (
             <span className="bg-[#1a3c34] text-white text-[9px] sm:text-[10px] font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full uppercase tracking-wider shadow-xs">
               Save {discountPercent}%
