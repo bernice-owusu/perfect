@@ -676,9 +676,14 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
 // Admin Auth
 app.post("/api/admin/login", (req, res) => {
   const { email, password } = req.body;
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@perfectforyou.com";
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+  const admin2Email = process.env.ADMIN2_EMAIL || "bernyx.owusu@gmail.com";
+  const admin2Password = process.env.ADMIN2_PASSWORD || "admin123";
+
   if (
-    (email === "admin@perfectforyou.com" && password === "admin123") ||
-    (email === "bernyx.owusu@gmail.com" && password === "admin123")
+    (email === adminEmail && password === adminPassword) ||
+    (email === admin2Email && password === admin2Password)
   ) {
     const token = crypto.randomBytes(32).toString("hex");
     adminTokens.add(token);
