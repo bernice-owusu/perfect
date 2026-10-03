@@ -41,9 +41,16 @@ export const CheckoutView: React.FC = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
 
+  // Delivery Details
+  const [region, setRegion] = useState("Greater Accra");
+  const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+
   // UI state
   const [errorMsg, setErrorMsg] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
 
   // Paystack (public key fetched from the backend; the popup opens inline)
   const [paystackKey, setPaystackKey] = useState("");
@@ -62,10 +69,10 @@ export const CheckoutView: React.FC = () => {
     };
   }, []);
 
-  // Delivery is arranged by our team after payment — no delivery details at checkout
+  // No delivery fee charged upfront — rider charges separately
   const deliveryFee = 0;
-  const productTotal = cartSubtotal; // Pay this now via Paystack
-  const orderTotal = productTotal; // Total order value
+  const productTotal = cartSubtotal;
+  const orderTotal = productTotal;
 
   if (cart.length === 0) {
     return (
@@ -90,12 +97,21 @@ export const CheckoutView: React.FC = () => {
     e.preventDefault();
     setErrorMsg("");
 
-    if (!fullName.trim() || !phone.trim()) {
-      setErrorMsg("Please fill in your name and phone number.");
+    if (currentStep === 1) {
+      if (!fullName.trim() || !phone.trim()) {
+        setErrorMsg("Please fill in your name and phone number.");
+        return;
+      }
+      setCurrentStep(2);
       return;
     }
 
-    // Open the Paystack popup straight away on "Pay Now".
+    if (!city.trim() || !address.trim()) {
+      setErrorMsg("Please fill in your city and delivery address.");
+      return;
+    }
+
+    // Open the Paystack popup on "Pay Now".
     await startPaystackPayment();
   };
 
@@ -127,8 +143,10 @@ export const CheckoutView: React.FC = () => {
           customer_name: fullName,
           email,
           phone,
-          region: "Ghana",
-          address: "",
+          region,
+          city,
+          address,
+          delivery_instructions: deliveryInstructions,
           items: cart.map((item) => ({
             product_id: item.product.id,
             product_name: item.product.name,
@@ -258,79 +276,167 @@ export const CheckoutView: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* LEFT: Form Steps */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Step 1: Contact Information */}
-            <div className="bg-white p-6 sm:p-7 rounded-3xl border border-black/5 card-shadow space-y-4">
-              <div className="flex items-center space-x-2.5 text-[#1a3c34] pb-3 border-b border-stone-100">
-                <div className="w-6 h-6 rounded-full bg-[#1a3c34] text-white flex items-center justify-center text-xs font-bold">
-                  1
+            {currentStep === 1 && (
+              <div className="bg-white p-6 sm:p-7 rounded-3xl border border-black/5 card-shadow space-y-4">
+                <div className="flex items-center space-x-2.5 text-[#1a3c34] pb-3 border-b border-stone-100">
+                  <div className="w-6 h-6 rounded-full bg-[#1a3c34] text-white flex items-center justify-center text-xs font-bold">
+                    1
+                  </div>
+                  <h2 className="font-serif text-lg font-semibold text-[#1a1a1a]">
+                    Contact Information
+                  </h2>
                 </div>
-                <h2 className="font-serif text-lg font-semibold text-[#1a1a1a]">
-                  Contact Information
-                </h2>
-              </div>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Full Name *
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                        <input
+                          id="checkout-name"
+                          type="text"
+                          required
+                          placeholder="Kwame Asante"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Email Address (Optional)
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                        <input
+                          id="checkout-email"
+                          type="email"
+                          placeholder="kwame@email.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Full Name *
+                      Phone Number (WhatsApp) *
                     </label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
                       <input
-                        id="checkout-name"
+                        id="checkout-phone"
+                        type="tel"
+                        required
+                        placeholder="024 123 4567"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                      />
+                    </div>
+                    <span className="text-[11px] text-stone-500 mt-1 block">
+                      We'll contact you via WhatsApp to arrange delivery.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="bg-white p-6 sm:p-7 rounded-3xl border border-black/5 card-shadow space-y-4">
+                <div className="flex items-center space-x-2.5 text-[#1a3c34] pb-3 border-b border-stone-100">
+                  <div className="w-6 h-6 rounded-full bg-[#1a3c34] text-white flex items-center justify-center text-xs font-bold">
+                    2
+                  </div>
+                  <h2 className="font-serif text-lg font-semibold text-[#1a1a1a]">
+                    Delivery Address
+                  </h2>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-sm text-stone-600">
+                    Provide your delivery address. Our team will confirm the exact location
+                    and the rider's fee (paid to rider on delivery) when we call within 24 hours.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        Region *
+                      </label>
+                      <select
+                        id="checkout-region"
+                        required
+                        value={region}
+                        onChange={(e) => setRegion(e.target.value)}
+                        className="w-full pl-4 pr-10 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34] appearance-none"
+                      >
+                        <option value="Greater Accra">Greater Accra</option>
+                        <option value="Ashanti Region">Ashanti Region</option>
+                        <option value="Western Region">Western Region</option>
+                        <option value="Eastern Region">Eastern Region</option>
+                        <option value="Northern Region">Northern Region</option>
+                        <option value="Central Region">Central Region</option>
+                        <option value="Volta Region">Volta Region</option>
+                        <option value="Other">Other Region</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        City / Town *
+                      </label>
+                      <input
+                        id="checkout-city"
                         type="text"
                         required
-                        placeholder="Kwame Asante"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                        placeholder="Accra, Kumasi, etc."
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full pl-4 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
                       />
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Email Address (Optional)
+                      Detailed Address / Landmark *
                     </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                      <input
-                        id="checkout-email"
-                        type="email"
-                        placeholder="kwame@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Phone Number (WhatsApp) *
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-                    <input
-                      id="checkout-phone"
-                      type="tel"
+                    <textarea
+                      id="checkout-address"
                       required
-                      placeholder="024 123 4567"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                      rows={3}
+                      placeholder="e.g., House No. 12, 5th Street, Near Community Center, East Legon"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className="w-full pl-4 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34] resize-none"
                     />
                   </div>
-                  <span className="text-[11px] text-stone-500 mt-1 block">
-                    After payment, our team will reach out within 24 hours to arrange delivery.
-                  </span>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Delivery Instructions (Optional)
+                    </label>
+                    <textarea
+                      id="checkout-delivery-instructions"
+                      rows={2}
+                      placeholder="e.g., Call before arriving, leave at reception, blue gate house"
+                      value={deliveryInstructions}
+                      onChange={(e) => setDeliveryInstructions(e.target.value)}
+                      className="w-full pl-4 pr-4 py-2.5 text-sm bg-[#f9f9f7] border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34] resize-none"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Delivery is arranged after payment — no delivery details needed */}
             <div className="bg-[#eae7e0]/60 rounded-3xl border border-black/5 p-6 sm:p-7">
               <div className="flex items-start space-x-4">
                 <div className="w-10 h-10 rounded-full bg-[#1a3c34] text-white flex items-center justify-center shrink-0">
@@ -341,15 +447,26 @@ export const CheckoutView: React.FC = () => {
                     Delivery Arranged After Payment
                   </h2>
                   <p className="text-sm text-stone-600 mt-1.5 leading-relaxed">
-                    You don't need to add delivery details now. After your payment
-                    is confirmed, our team will reach out to you{" "}
-                    <strong className="text-[#1a3c34]">within 24 hours</strong> to
-                    confirm your order, take your delivery address, and schedule
-                    delivery at a time that suits you.
+                    No delivery fee is charged now. After your payment is confirmed, our team
+                    will reach out to you <strong className="text-[#1a3c34]">within 24 hours</strong>
+                    to confirm your address, share the rider's exact fee, and schedule delivery
+                    at a time that suits you. You pay the rider directly on delivery.
                   </p>
                 </div>
               </div>
             </div>
+
+            {currentStep === 1 && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                className="w-full py-3.5 bg-[#1a3c34] hover:bg-[#2a4d45] text-white rounded-full font-semibold text-sm tracking-wide shadow-md transition-all active:scale-98"
+              >
+                Continue to Delivery Details
+              </button>
+            )}
+
+            
           </div>
 
           {/* RIGHT: Order Summary */}

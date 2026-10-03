@@ -7,6 +7,7 @@ import { WhatsAppButton } from "./components/WhatsAppButton.tsx";
 import { CartDrawer } from "./components/CartDrawer.tsx";
 import { HomeView } from "./components/HomeView.tsx";
 import { ShopView } from "./components/ShopView.tsx";
+import { TipsView } from "./components/TipsView.tsx";
 import { ProductDetailView } from "./components/ProductDetailView.tsx";
 import { CartView } from "./components/CartView.tsx";
 import { CheckoutView } from "./components/CheckoutView.tsx";
@@ -53,6 +54,7 @@ const StoreApp: React.FC = () => {
         {currentRoute === "order-confirmation" && <OrderConfirmationView />}
         {currentRoute === "wishlist" && <WishlistView />}
         {currentRoute === "about" && <AboutView />}
+        {currentRoute === "tips" && <TipsView />}
       </main>
 
       {/* Global Footer */}

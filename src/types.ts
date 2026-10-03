@@ -137,6 +137,21 @@ export interface CustomerReview {
   verified_purchase: boolean;
 }
 
+export interface ProductTip {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  product_id?: string;
+  product_name?: string;
+  category_id?: string;
+  category_name?: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface DashboardStats {
   totalSales: number;
   totalOrders: number;

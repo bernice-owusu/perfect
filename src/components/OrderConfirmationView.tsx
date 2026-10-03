@@ -141,12 +141,31 @@ export const OrderConfirmationView: React.FC = () => {
               <span className="text-stone-500">Phone Number:</span>
               <span className="font-semibold text-stone-900">{order.phone}</span>
             </div>
+            {order.address && (
+              <div className="flex justify-between pb-2 border-b border-stone-200">
+                <span className="text-stone-500">Delivery Address:</span>
+                <span className="font-semibold text-stone-900 text-right max-w-[60%] text-align-right">
+                  {order.city}, {order.region} — {order.address}
+                </span>
+              </div>
+            )}
+            {order.delivery_instructions && (
+              <div className="flex justify-between pb-2 border-b border-stone-200">
+                <span className="text-stone-500">Instructions:</span>
+                <span className="font-semibold text-stone-900 text-right max-w-[60%] text-align-right">
+                  {order.delivery_instructions}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between pt-1">
               <span className="text-stone-500">Total Amount Paid:</span>
               <span className="font-bold text-base text-[#1a3c34]">
                 {formatPrice(order.total)}
               </span>
             </div>
+            <p className="text-[10px] text-amber-700 bg-amber-50 p-2 rounded-lg font-medium text-center">
+              Delivery fee not included — pay rider directly on delivery
+            </p>
           </div>
         )}
 

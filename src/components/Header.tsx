@@ -13,6 +13,7 @@ import {
   HeartHandshake,
   CheckCircle2,
   Music2,
+  Lightbulb,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../context/StoreContext.tsx";
@@ -304,6 +305,18 @@ export const Header: React.FC = () => {
             >
               About
             </button>
+
+            <button
+              id="nav-tips-btn"
+              onClick={() => navigate("tips")}
+              className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 ${
+                currentRoute === "tips"
+                  ? "bg-[#1a3c34] text-white shadow-xs"
+                  : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
+              }`}
+            >
+              Tips
+            </button>
           </nav>
 
           {/* Right Action Icons & Search */}
@@ -577,24 +590,41 @@ export const Header: React.FC = () => {
 
 <button
   id="drawer-nav-about-btn"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        navigate("about");
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold transition-all ${
-                        currentRoute === "about"
-                          ? "bg-[#1a3c34] text-white shadow-xs"
-                          : "text-[#1a1a1a] hover:bg-black/5"
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2.5">
-                        <HeartHandshake className="w-4 h-4 text-[#1a3c34]" />
-                        <span>About Perfect For You</span>
-                      </div>
-                      <span className="text-[11px] text-[#5a5a40]">Contact &amp; Info</span>
-                    </button>
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate("about");
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold transition-all ${
+                    currentRoute === "about"
+                      ? "bg-[#1a3c34] text-white shadow-xs"
+                      : "text-[#1a1a1a] hover:bg-black/5"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <HeartHandshake className="w-4 h-4 text-[#1a3c34]" />
+                    <span>About Perfect For You</span>
+                  </div>
+                  <span className="text-[11px] text-[#5a5a40]">Contact & Info</span>
+                </button>
 
-                    
+                <button
+                  id="drawer-nav-tips-btn"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate("tips");
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-xs sm:text-sm font-semibold transition-all ${
+                    currentRoute === "tips"
+                      ? "bg-[#1a3c34] text-white shadow-xs"
+                      : "text-[#1a1a1a] hover:bg-black/5"
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Lightbulb className="w-4 h-4 text-[#1a3c34]" />
+                    <span>Tips & Usage Guides</span>
+                  </div>
+                  <span className="text-[11px] text-[#5a5a40]">Product How-To</span>
+</button>
 
                     <div className="pt-2.5 pb-1">
                       <div className="h-px bg-black/5" />

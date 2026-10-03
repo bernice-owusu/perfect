@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, ShoppingBag, Heart, ShoppingCart } from "lucide-react";
+import { Home, ShoppingBag, Heart, ShoppingCart, Lightbulb } from "lucide-react";
 import { useStore, AppRoute } from "../context/StoreContext.tsx";
 
 export const BottomNav: React.FC = () => {
@@ -10,6 +10,7 @@ export const BottomNav: React.FC = () => {
   const navItems: { label: string; route: AppRoute; icon: React.ReactNode; badge?: number }[] = [
     { label: "Home", route: "home", icon: <Home className="w-5 h-5" /> },
     { label: "Shop", route: "shop", icon: <ShoppingBag className="w-5 h-5" /> },
+    { label: "Tips", route: "tips", icon: <Lightbulb className="w-5 h-5" /> },
     { label: "Wishlist", route: "wishlist", icon: <Heart className="w-5 h-5" />, badge: wishlist.length },
     { label: "Cart", route: "cart", icon: <ShoppingCart className="w-5 h-5" />, badge: cartCount },
   ];

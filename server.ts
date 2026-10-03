@@ -5,7 +5,7 @@ import fs from "fs";
 import multer from "multer";
 import * as crypto from "crypto";
 import { MongoClient, type Db } from "mongodb";
-import type { Product, Category, Order, StoreSettings, CustomerReview } from "./src/types.ts";
+import type { Product, Category, Order, StoreSettings, CustomerReview, ProductTip } from "./src/types.ts";
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -92,6 +92,7 @@ interface StoreData {
   orders: Order[];
   settings: StoreSettings;
   reviews: CustomerReview[];
+  tips: ProductTip[];
 }
 
 // Fresh-start seed: default categories + settings only (needed by the
@@ -104,6 +105,7 @@ function createEmptyStore(): StoreData {
     orders: [],
     settings: initialSettings,
     reviews: [],
+    tips: [],
   };
 }
 
@@ -147,6 +149,12 @@ async function loadStoreFromDb(): Promise<StoreData | null> {
     const data: Record<string, unknown> = { ...(doc as unknown as Record<string, unknown>) };
     delete data._id;
     delete data.updatedAt;
+    if (!data.tips) data.tips = [];
+    if (!data.reviews) data.reviews = [];
+    if (!data.orders) data.orders = [];
+    if (!data.products) data.products = [];
+    if (!data.categories) data.categories = [];
+    if (!data.settings) data.settings = initialSettings;
     return data as unknown as StoreData;
   } catch (err) {
     console.error("Error reading store from MongoDB:", err);
@@ -316,6 +324,100 @@ app.put("/api/categories/:id", requireAdmin, async (req, res) => {
   }
   await saveData(store);
   res.json({ success: true, category: store.categories[index] });
+});
+
+app.delete("/api/categories/:id", requireAdmin, async (req, res) => {
+  const index = store.categories.findIndex((c) => c.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Category not found" });
+
+  // Check if category has products
+  const hasProducts = store.products.some((p) => p.category_id === req.params.id);
+  if (hasProducts) {
+    return res.status(400).json({ error: "Cannot delete category with products. Move or delete products first." });
+  }
+
+  store.categories.splice(index, 1);
+  await saveData(store);
+  res.json({ success: true });
+});
+
+// Tips / Usage Guides
+app.get("/api/tips", async (_req, res) => {
+  await refreshStore();
+  const activeTips = store.tips.filter((t) => t.is_active);
+  activeTips.sort((a, b) => a.display_order - b.display_order);
+  res.json({ tips: activeTips });
+});
+
+app.get("/api/tips/all", requireAdmin, async (_req, res) => {
+  await refreshStore();
+  const allTips = [...store.tips].sort((a, b) => a.display_order - b.display_order);
+  res.json({ tips: allTips });
+});
+
+app.post("/api/tips", requireAdmin, async (req, res) => {
+  const { title, description, image, product_id, category_id, is_active, display_order } = req.body;
+  if (!title || !image) {
+    return res.status(400).json({ error: "Title and image are required" });
+  }
+
+  let product_name: string | undefined;
+  if (product_id) {
+    const product = store.products.find((p) => p.id === product_id);
+    if (product) product_name = product.name;
+  }
+
+  let category_name: string | undefined;
+  if (category_id) {
+    const category = store.categories.find((c) => c.id === category_id);
+    if (category) category_name = category.name;
+  }
+
+  const newTip: ProductTip = {
+    id: `tip-${Date.now()}`,
+    title,
+    description: description || "",
+    image,
+    product_id,
+    product_name,
+    category_id,
+    category_name,
+    is_active: is_active !== false,
+    display_order: display_order ?? store.tips.length,
+    created_at: new Date().toISOString(),
+  };
+
+  store.tips.push(newTip);
+  await saveData(store);
+  res.status(201).json({ success: true, tip: newTip });
+});
+
+app.put("/api/tips/:id", requireAdmin, async (req, res) => {
+  const index = store.tips.findIndex((t) => t.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Tip not found" });
+
+  const updates = req.body;
+  if (updates.product_id) {
+    const product = store.products.find((p) => p.id === updates.product_id);
+    if (product) updates.product_name = product.name;
+  }
+  if (updates.category_id) {
+    const category = store.categories.find((c) => c.id === updates.category_id);
+    if (category) updates.category_name = category.name;
+  }
+
+  store.tips[index] = { ...store.tips[index], ...updates, updated_at: new Date().toISOString() };
+  await saveData(store);
+  res.json({ success: true, tip: store.tips[index] });
+});
+
+app.delete("/api/tips/:id", requireAdmin, async (req, res) => {
+  const index = store.tips.findIndex((t) => t.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Tip not found" });
+
+  store.tips.splice(index, 1);
+  await saveData(store);
+  res.json({ success: true });
 });
 
 // Products

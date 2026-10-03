@@ -6,6 +6,7 @@ import type {
   StoreSettings,
   CustomerReview,
   Order,
+  ProductTip,
 } from "../types.ts";
 
 export type AppRoute =
@@ -19,6 +20,7 @@ export type AppRoute =
   | "contact"
   | "faq"
   | "wishlist"
+  | "tips"
   | "admin";
 
 interface RouteParams {
@@ -40,6 +42,7 @@ interface StoreContextType {
   settings: StoreSettings | null;
   reviews: CustomerReview[];
   orders: Order[];
+  tips: ProductTip[];
   isLoading: boolean;
   currentRoute: AppRoute;
   routeParams: RouteParams;
@@ -77,6 +80,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [reviews, setReviews] = useState<CustomerReview[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [tips, setTips] = useState<ProductTip[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Check if current URL is /perfectadmin or #perfectadmin
@@ -182,12 +186,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             headers: { Authorization: `Bearer ${localStorage.getItem("pfy_admin_token") || ""}` },
           })
         : Promise.resolve(null);
-      const [prodsRes, catsRes, setRes, revsRes, ordersRes] = await Promise.all([
+      const [prodsRes, catsRes, setRes, revsRes, ordersRes, tipsRes] = await Promise.all([
         fetch("/api/products?active_only=false"),
         fetch("/api/categories"),
         fetch("/api/settings"),
         fetch("/api/reviews"),
         ordersFetch,
+        fetch("/api/tips"),
       ]);
 
       if (prodsRes.ok) {
@@ -209,6 +214,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (ordersRes && ordersRes.ok) {
         const d = await ordersRes.json();
         setOrders(d.orders || []);
+      }
+      if (tipsRes.ok) {
+        const d = await tipsRes.json();
+        setTips(d.tips || []);
       }
     } catch (err) {
       console.error("Error loading store data:", err);
@@ -457,6 +466,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         settings,
         reviews,
         orders,
+        tips,
         isLoading,
         currentRoute,
         routeParams,

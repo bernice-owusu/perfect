@@ -26,10 +26,11 @@ import {
   MessageCircle,
   Phone,
   Star,
+  Lightbulb,
 } from "lucide-react";
 import { useStore } from "../../context/StoreContext.tsx";
 import { BrandLogo } from "../BrandLogo.tsx";
-import type { Product, Order, OrderStatus, Category, StoreSettings } from "../../types.ts";
+import type { Product, Order, OrderStatus, Category, StoreSettings, ProductTip } from "../../types.ts";
 
 export const AdminPortal: React.FC = () => {
   const {
@@ -41,6 +42,7 @@ export const AdminPortal: React.FC = () => {
     categories,
     orders,
     reviews,
+    tips,
     settings,
     refreshData,
     navigate,
@@ -63,9 +65,9 @@ export const AdminPortal: React.FC = () => {
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // Active Admin Tab: 'dashboard' | 'products' | 'orders' | 'categories' | 'settings' | 'sets' | 'reviews'
+  // Active Admin Tab: 'dashboard' | 'products' | 'orders' | 'categories' | 'settings' | 'sets' | 'reviews' | 'tips'
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "products" | "orders" | "categories" | "settings" | "sets" | "reviews"
+    "dashboard" | "products" | "orders" | "categories" | "settings" | "sets" | "reviews" | "tips"
   >("dashboard");
 
   // Admin stats
@@ -85,6 +87,11 @@ export const AdminPortal: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
   const catImageInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Tip Modal / Editing State
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [editingTip, setEditingTip] = useState<Partial<ProductTip> | null>(null);
+  const tipImageInputRef = React.useRef<HTMLInputElement>(null);
+
   // Order status modal
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
@@ -93,6 +100,8 @@ export const AdminPortal: React.FC = () => {
 
   // Delete-product confirmation modal
   const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null);
+  // Delete-category confirmation modal
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Settings form state
   const [tempSettings, setTempSettings] = useState<StoreSettings | null>(settings);
@@ -180,6 +189,44 @@ export const AdminPortal: React.FC = () => {
           if (existing.length >= MAX_PRODUCT_IMAGES) return prev;
           return { ...prev!, images: [...existing, data.imageUrl] };
         });
+        setUploadError("");
+      } else {
+        setUploadError(data.error || "Upload failed");
+      }
+    } catch (err) {
+      console.error(err);
+      setUploadError("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Tip Image Upload Handler
+  const handleTipImageUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File size must be less than 5MB");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError("");
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const res = await fetch("/api/upload/image", {
+        method: "POST",
+        headers: adminHeaders(false),
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.imageUrl) {
+        setEditingTip((prev) => (prev ? { ...prev, image: data.imageUrl } : null));
         setUploadError("");
       } else {
         setUploadError(data.error || "Upload failed");
@@ -317,6 +364,70 @@ export const AdminPortal: React.FC = () => {
       console.error(err);
       alert("Error saving category");
     }
+  };
+
+  // Delete Category
+  const handleDeleteCategory = (cat: Category) => {
+    setCategoryToDelete({ id: cat.id, name: cat.name });
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    try {
+      const res = await fetch(`/api/categories/${categoryToDelete.id}`, { method: "DELETE", headers: adminHeaders() });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Delete failed");
+      }
+      setCategoryToDelete(null);
+      await refreshData();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Failed to delete category");
+      setCategoryToDelete(null);
+    }
+  };
+
+  // Tip Management
+  const handleSaveTip = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTip?.title) {
+      alert("Please enter a title");
+      return;
+    }
+    if (!editingTip?.image) {
+      alert("Please upload an image");
+      return;
+    }
+
+    try {
+      const endpoint = editingTip.id ? `/api/tips/${editingTip.id}` : "/api/tips";
+      const method = editingTip.id ? "PUT" : "POST";
+      await fetch(endpoint, {
+        method,
+        headers: adminHeaders(),
+        body: JSON.stringify(editingTip),
+      });
+      setShowTipModal(false);
+      setEditingTip(null);
+      await refreshData();
+    } catch (err) {
+      console.error(err);
+      alert("Error saving tip");
+    }
+  };
+
+  const handleDeleteTip = (tip: ProductTip) => {
+    if (!confirm(`Delete tip "${tip.title}"? This cannot be undone.`)) return;
+    fetch(`/api/tips/${tip.id}`, { method: "DELETE", headers: adminHeaders() })
+      .then((res) => {
+        if (!res.ok) throw new Error("Delete failed");
+        return refreshData();
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Failed to delete tip");
+      });
   };
 
   // Delete Product
@@ -704,6 +815,18 @@ export const AdminPortal: React.FC = () => {
           >
             <Layers className="w-4 h-4" />
             <span>Categories</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("tips")}
+            className={`py-3 px-3 sm:px-4 border-b-2 whitespace-nowrap transition-colors flex items-center space-x-1.5 ${
+              activeTab === "tips"
+                ? "border-white text-white font-bold"
+                : "border-transparent text-stone-300 hover:text-white"
+            }`}
+          >
+            <Lightbulb className="w-4 h-4" />
+            <span>Tips ({tips?.filter((t) => t.is_active).length || 0})</span>
           </button>
 
           <button
@@ -1678,6 +1801,14 @@ export const AdminPortal: React.FC = () => {
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
+                    <button
+                      onClick={() => handleDeleteCategory(cat)}
+                      className="absolute top-2.5 right-11 p-2 bg-white/90 backdrop-blur-xs text-stone-700 hover:text-rose-600 rounded-full shadow-xs transition-colors"
+                      title="Delete category"
+                      aria-label={`Delete ${cat.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                     {!cat.is_active && (
                       <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stone-800/80 text-white">
                         Hidden
@@ -1884,6 +2015,147 @@ export const AdminPortal: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* ======================================= */}
+      {/* TAB 6: TIPS / USAGE GUIDES                */}
+      {/* ======================================= */}
+      {activeTab === "tips" && (
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-serif text-2xl font-semibold text-stone-900">
+                  Tips & Usage Guides
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Visual guides showing customers how to use your products effectively.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditingTip({
+                    title: "",
+                    description: "",
+                    image: "",
+                    product_id: undefined,
+                    category_id: undefined,
+                    is_active: true,
+                    display_order: (tips?.length || 0) + 1,
+                  });
+                  setShowTipModal(true);
+                }}
+                className="px-4 py-2 bg-[#1a3c34] hover:bg-[#2a4d45] text-white rounded-full text-xs font-semibold flex items-center space-x-1.5 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Tip</span>
+              </button>
+            </div>
+
+            {tips && tips.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {tips
+                  .slice()
+                  .sort((a, b) => a.display_order - b.display_order)
+                  .map((tip) => (
+                    <div
+                      key={tip.id}
+                      className="bg-white rounded-3xl border border-stone-200 overflow-hidden shadow-xs flex flex-col"
+                    >
+                      <div className="aspect-4/3 relative bg-stone-100">
+                        <img
+                          src={tip.image}
+                          alt={tip.title}
+                          className="w-full h-full object-cover"
+                        />
+                        {!tip.is_active && (
+                          <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stone-800/80 text-white">
+                            Hidden
+                          </span>
+                        )}
+                        <div className="absolute top-2.5 right-2.5 flex space-x-1">
+                          <button
+                            onClick={() => {
+                              setEditingTip({ ...tip });
+                              setShowTipModal(true);
+                            }}
+                            className="p-2 bg-white/90 backdrop-blur-xs text-stone-700 hover:text-[#1a3c34] rounded-full shadow-xs transition-colors"
+                            title="Edit tip"
+                            aria-label={`Edit ${tip.title}`}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTip(tip)}
+                            className="p-2 bg-white/90 backdrop-blur-xs text-stone-700 hover:text-rose-600 rounded-full shadow-xs transition-colors"
+                            title="Delete tip"
+                            aria-label={`Delete ${tip.title}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-5 flex-1 flex flex-col">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h3 className="font-serif text-lg font-semibold text-stone-900 flex-1">
+                            {tip.title}
+                          </h3>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">
+                            #{tip.display_order}
+                          </span>
+                        </div>
+                        <p className="text-xs text-stone-500 line-clamp-3 flex-1">
+                          {tip.description}
+                        </p>
+                        <div className="mt-3 flex items-center gap-2 text-[10px] text-stone-400">
+                          {tip.product_name && (
+                            <span className="bg-stone-100 px-2 py-0.5 rounded-full">
+                              Product: {tip.product_name}
+                            </span>
+                          )}
+                          {tip.category_name && (
+                            <span className="bg-stone-100 px-2 py-0.5 rounded-full">
+                              Category: {tip.category_name}
+                            </span>
+                          )}
+                          {!tip.product_name && !tip.category_name && (
+                            <span className="bg-stone-100 px-2 py-0.5 rounded-full">General</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-white rounded-3xl border border-stone-200">
+                <Lightbulb className="w-12 h-12 mx-auto text-stone-300 mb-4" />
+                <h3 className="font-serif text-xl text-stone-900 mb-2">No Tips Yet</h3>
+                <p className="text-sm text-stone-500 mb-6 max-w-md mx-auto">
+                  Add usage guides to help customers get the most out of your products.
+                </p>
+                <button
+                  onClick={() => {
+                    setEditingTip({
+                      title: "",
+                      description: "",
+                      image: "",
+                      product_id: undefined,
+                      category_id: undefined,
+                      is_active: true,
+                      display_order: (tips?.length || 0) + 1,
+                    });
+                    setShowTipModal(true);
+                  }}
+                  className="px-6 py-2.5 bg-[#1a3c34] hover:bg-[#2a4d45] text-white rounded-full text-sm font-semibold flex items-center space-x-2 mx-auto shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Your First Tip</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </main>
+      )}
 
       {/* ============================================ */}
       {/* MODAL: ADD / EDIT PRODUCT (PRD #22)          */}
@@ -2374,6 +2646,224 @@ export const AdminPortal: React.FC = () => {
       )}
 
       {/* ============================================ */}
+      {/* MODAL: ADD / EDIT TIP                        */}
+      {/* ============================================ */}
+      {showTipModal && editingTip && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex overflow-y-auto p-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-stone-200 m-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-stone-200 mb-6">
+              <h3 className="font-serif text-xl font-semibold text-stone-900">
+                {editingTip.id ? "Edit Tip" : "Add New Tip"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowTipModal(false);
+                  setEditingTip(null);
+                }}
+                className="p-1.5 text-stone-400 hover:text-stone-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTip} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingTip.title || ""}
+                  onChange={(e) =>
+                    setEditingTip({
+                      ...editingTip,
+                      title: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. How to apply Hair Oil"
+                  className="w-full px-4 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Image *
+                </label>
+                <input
+                  ref={tipImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleTipImageUpload(file);
+                      e.target.value = "";
+                    }}
+                  className="hidden"
+                />
+                <div
+                  className="border-2 border-dashed rounded-xl p-6 text-center transition-colors border-[#1a3c34]/30 bg-[#1a3c34]/5 hover:border-[#1a3c34]/50 hover:bg-[#1a3c34]/10 cursor-pointer"
+                  onClick={() => tipImageInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.add("border-[#1a3c34]", "bg-[#1a3c34]/10");
+                  }}
+                  onDragLeave={(e) => {
+                    e.currentTarget.classList.remove("border-[#1a3c34]", "bg-[#1a3c34]/10");
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove("border-[#1a3c34]", "bg-[#1a3c34]/10");
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleTipImageUpload(file);
+                  }}
+                >
+                  <Upload className="w-8 h-8 mx-auto text-[#1a3c34]/60 mb-2" />
+                  <p className="text-sm font-medium text-stone-700">
+                    Click or drag image to upload
+                  </p>
+                  <p className="text-xs text-stone-500 mt-1">
+                    JPEG, PNG, WebP or GIF • Max 5MB
+                  </p>
+                </div>
+                {editingTip.image && (
+                  <div className="mt-3 relative aspect-video max-w-xs mx-auto rounded-xl overflow-hidden border border-stone-200">
+                    <img
+                      src={editingTip.image}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditingTip({
+                          ...editingTip,
+                          image: "",
+                        })
+                      }
+                      className="absolute top-2 right-2 p-1 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors"
+                      aria-label="Remove image"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                {uploadError && <p className="text-xs text-rose-600 mt-1">{uploadError}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Linked Product (Optional)
+                  </label>
+                  <select
+                    value={editingTip.product_id || ""}
+                    onChange={(e) => {
+                      const productId = e.target.value;
+                      const product = products.find((p) => p.id === productId);
+                      setEditingTip({
+                        ...editingTip,
+                        product_id: productId || undefined,
+                        product_name: product?.name,
+                      });
+                    }}
+                    className="w-full px-4 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                  >
+                    <option value="">No specific product</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-stone-700 mb-1">
+                    Linked Category (Optional)
+                  </label>
+                  <select
+                    value={editingTip.category_id || ""}
+                    onChange={(e) => {
+                      const categoryId = e.target.value;
+                      const category = categories.find((c) => c.id === categoryId);
+                      setEditingTip({
+                        ...editingTip,
+                        category_id: categoryId || undefined,
+                        category_name: category?.name,
+                      });
+                    }}
+                    className="w-full px-4 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                  >
+                    <option value="">No specific category</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-stone-700 mb-1">
+                  Display Order
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editingTip.display_order || 1}
+                  onChange={(e) =>
+                    setEditingTip({
+                      ...editingTip,
+                      display_order: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-4 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                />
+              </div>
+
+              <label className="flex items-center space-x-2 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={editingTip.is_active ?? true}
+                  onChange={(e) =>
+                    setEditingTip({
+                      ...editingTip,
+                      is_active: e.target.checked,
+                    })
+                  }
+                  className="rounded text-[#1a3c34] focus:ring-[#1a3c34]"
+                />
+                <span>Active (visible on storefront)</span>
+              </label>
+
+              <div className="pt-4 border-t border-stone-200 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTipModal(false);
+                    setEditingTip(null);
+                    setUploadError("");
+                    setUploading(false);
+                  }}
+                  className="px-5 py-2.5 bg-stone-100 hover:bg-stone-200 rounded-xl font-semibold text-stone-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-[#1a3c34] hover:bg-[#2a4d45] text-white rounded-xl font-semibold"
+                >
+                  Save Tip
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================ */}
       {/* MODAL: ADD REVIEW (ON BEHALF OF CUSTOMER) */}
       {/* ============================================ */}
       {showReviewModal && (
@@ -2712,6 +3202,42 @@ export const AdminPortal: React.FC = () => {
                   setProductToDelete(null);
                   handleDeleteProduct(id);
                 }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 rounded-xl font-semibold text-xs text-white transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================ */}
+      {/* MODAL: DELETE CATEGORY CONFIRMATION            */}
+      {/* ============================================ */}
+      {categoryToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex overflow-y-auto p-4">
+          <div className="w-full max-w-sm m-auto bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-stone-200 space-y-5 text-center">
+            <div className="w-12 h-12 mx-auto rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-serif text-xl font-semibold text-stone-900">
+                Delete this category?
+              </h3>
+              <p className="text-xs text-stone-500 mt-1 leading-relaxed">
+                &ldquo;{categoryToDelete.name}&rdquo; will be permanently removed from your store and
+                cannot be undone. Products in this category must be moved or deleted first.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCategoryToDelete(null)}
+                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 rounded-xl font-semibold text-xs text-stone-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteCategory}
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 rounded-xl font-semibold text-xs text-white transition-colors"
               >
                 Delete
