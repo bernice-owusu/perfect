@@ -48,20 +48,52 @@ export const AdminPortal: React.FC = () => {
     navigate,
   } = useStore();
 
-  // Admin API helpers — every admin request must carry the Bearer session token.
-  const adminToken = () => localStorage.getItem("pfy_admin_token") || "";
+  // Admin API helpers — JWT access token + automatic refresh
+  const getAccessToken = () => localStorage.getItem("pfy_admin_access_token") || "";
+  const getRefreshToken = () => localStorage.getItem("pfy_admin_refresh_token") || "";
+  
   const adminHeaders = (json = true) => {
-    const headers: Record<string, string> = { Authorization: `Bearer ${adminToken()}` };
+    const headers: Record<string, string> = { Authorization: `Bearer ${getAccessToken()}` };
     if (json) headers["Content-Type"] = "application/json";
+    const token = localStorage.getItem("pfy_csrf_token");
+    if (token) headers["X-CSRF-Token"] = token;
     return headers;
   };
+
+  // Refresh access token using refresh token cookie (handled by server)
+  const refreshAccessToken = async (): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/admin/refresh", {
+        method: "POST",
+        credentials: "include", // Important for httpOnly cookie
+      });
+      const data = await res.json();
+      if (res.ok && data.accessToken) {
+        localStorage.setItem("pfy_admin_access_token", data.accessToken);
+        return true;
+      }
+    } catch (e) {
+      console.error("Token refresh failed:", e);
+    }
+    return false;
+  };
+
+  // Fetch CSRF token on mount
+  React.useEffect(() => {
+    fetch("/api/csrf-token")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.csrfToken) localStorage.setItem("pfy_csrf_token", d.csrfToken);
+      })
+      .catch(() => {});
+  }, []);
 
   // Max gallery images per product (bags use the full set; all products allow this).
   const MAX_PRODUCT_IMAGES = 5;
 
   // Login form state
-  const [emailInput, setEmailInput] = useState("admin@perfectforyou.com");
-  const [passwordInput, setPasswordInput] = useState("admin123");
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -252,9 +284,15 @@ export const AdminPortal: React.FC = () => {
       });
       if (res.ok) {
         const data = await res.json();
-        loginAdmin(data.token, data.user);
+        // Store access token (refresh token is in httpOnly cookie)
+        localStorage.setItem("pfy_admin_access_token", data.accessToken);
+        loginAdmin("", data.user); // token param not used anymore
+        // Fetch new CSRF token after login
+        const csrfRes = await fetch("/api/csrf-token", { credentials: "include" });
+        const csrfData = await csrfRes.json();
+        if (csrfData.csrfToken) localStorage.setItem("pfy_csrf_token", csrfData.csrfToken);
       } else {
-        setLoginError("Invalid email or password. Please use admin@perfectforyou.com / admin123");
+        setLoginError("Invalid email or password. Please contact the administrator.");
       }
     } catch (err) {
       console.error(err);
@@ -657,7 +695,6 @@ export const AdminPortal: React.FC = () => {
           </form>
 
           <div className="pt-4 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
-            <span>Demo: admin@perfectforyou.com</span>
             <button
               onClick={() => navigate("home")}
               className="text-[#1a3c34] hover:underline font-medium"

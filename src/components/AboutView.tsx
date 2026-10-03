@@ -41,7 +41,7 @@ export const AboutView: React.FC = () => {
   const mapEmbedUrl =
     "https://maps.google.com/maps?q=" +
     encodeURIComponent(
-      "Perfect For You, St John's Overhead, Achimota, Accra, Ghana"
+      "Perfect For You, St John's Overhead, Achimota, Accra, Ghana",
     ) +
     "&output=embed";
 
@@ -76,7 +76,7 @@ export const AboutView: React.FC = () => {
               Get To Know Us
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl text-[#1a3c34] font-medium leading-tight">
-              Beauty, Confidence &amp; Simplicity —{" "}
+              Beauty, Confidence &amp; Simplicity{" "}
               <span className="italic">for every Ghanaian woman.</span>
             </h2>
             <p className="text-[#5a5a40] text-sm sm:text-base leading-relaxed">
@@ -288,7 +288,7 @@ export const AboutView: React.FC = () => {
 
             <a
               href={`https://wa.me/${phone}?text=${encodeURIComponent(
-                "Hi Perfect For You, I'm reaching out from your About page."
+                "Hi Perfect For You, I'm reaching out from your About page.",
               )}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -407,9 +407,7 @@ export const AboutView: React.FC = () => {
                 <h3 className="font-serif text-lg font-semibold">
                   TikTok — Main
                 </h3>
-                <p className="text-xs text-stone-300 mt-1">
-                  @perfect_for_you2
-                </p>
+                <p className="text-xs text-stone-300 mt-1">@perfect_for_you2</p>
               </div>
               <span className="text-[10px] font-bold uppercase tracking-wider bg-white/10 px-3 py-1 rounded-full border border-white/15">
                 Follow Us
@@ -503,8 +501,8 @@ export const AboutView: React.FC = () => {
                 Secure Payments
               </h4>
               <p className="text-xs text-[#5a5a40] leading-relaxed mt-1">
-                Paystack-secured checkout with tracked &amp; verified payments for
-                every order.
+                Paystack-secured checkout with tracked &amp; verified payments
+                for every order.
               </p>
             </div>
           </div>

@@ -121,9 +121,14 @@ export const CheckoutView: React.FC = () => {
     try {
       setIsProcessing(true);
 
+      // Fetch CSRF token first
+      const csrfRes = await fetch("/api/csrf-token");
+      const csrfData = await csrfRes.json();
+      const csrfToken = csrfData.csrfToken || "";
+
       const verifyRes = await fetch("/api/paystack/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
         body: JSON.stringify({ reference, amount: productTotal }),
       });
 
@@ -138,7 +143,7 @@ export const CheckoutView: React.FC = () => {
       // Create order on backend
       const orderRes = await fetch("/api/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
         body: JSON.stringify({
           customer_name: fullName,
           email,

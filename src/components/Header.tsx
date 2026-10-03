@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Music2,
   Lightbulb,
+  ChevronDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useStore } from "../context/StoreContext.tsx";
@@ -36,7 +37,10 @@ export const Header: React.FC = () => {
   } = useStore();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
+  const [mobileShopOpen, setMobileShopOpen] = useState(false);
   const drawerSearchInputRef = useRef<HTMLInputElement>(null);
+  const shopDropdownRef = useRef<HTMLDivElement>(null);
 
   // Lock background scrolling when mobile drawer is open so it stays fixed over the page
   useEffect(() => {
@@ -70,6 +74,19 @@ export const Header: React.FC = () => {
       document.body.style.overflow = "";
     };
   }, [mobileMenuOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (shopDropdownRef.current && !shopDropdownRef.current.contains(e.target as Node)) {
+        setShopDropdownOpen(false);
+      }
+    };
+    if (shopDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [shopDropdownOpen]);
 
   // If in admin route, header has a different, admin-specific look or can be omitted
   if (currentRoute === "admin") {
@@ -217,7 +234,7 @@ export const Header: React.FC = () => {
           <nav
             id="main-menu-bar"
             aria-label="Main Navigation Menu"
-            className="hidden lg:flex items-center space-x-1 xl:space-x-2 text-xs uppercase tracking-wider font-semibold text-[#1a1a1a]/75 whitespace-nowrap overflow-x-auto no-scrollbar"
+            className="hidden lg:flex items-center space-x-1 xl:space-x-2 text-xs uppercase tracking-wider font-semibold text-[#1a1a1a]/75 whitespace-nowrap"
           >
             <button
               id="nav-home-btn"
@@ -231,68 +248,96 @@ export const Header: React.FC = () => {
               Home
             </button>
 
-            <button
-              id="nav-shop-all-btn"
-              onClick={() => {
-                setSelectedCategory("all");
-                navigate("shop");
+            {/* Shop All Dropdown */}
+            <div
+              className="relative"
+              ref={shopDropdownRef}
+              onMouseEnter={() => setShopDropdownOpen(true)}
+              onMouseLeave={() => {
+                // Small delay to allow moving mouse to dropdown
+                setTimeout(() => setShopDropdownOpen(false), 150);
               }}
-              className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 ${
-                currentRoute === "shop" && selectedCategory === "all"
-                  ? "bg-[#1a3c34] text-white shadow-xs"
-                  : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
-              }`}
             >
-              Shop All
-            </button>
+              <button
+                id="nav-shop-all-btn"
+                onClick={() => setShopDropdownOpen(!shopDropdownOpen)}
+                onMouseEnter={() => setShopDropdownOpen(true)}
+                className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 flex items-center space-x-1 ${
+                  (currentRoute === "shop" && selectedCategory === "all") || shopDropdownOpen
+                    ? "bg-[#1a3c34] text-white shadow-xs"
+                    : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
+                }`}
+                aria-haspopup="true"
+                aria-expanded={shopDropdownOpen}
+              >
+                <span>Shop</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${shopDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
 
-            <button
-              id="nav-hair-btn"
-              onClick={() => handleCategoryClick("hair")}
-              className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 ${
-                currentRoute === "shop" && selectedCategory === "hair"
-                  ? "bg-[#1a3c34] text-white shadow-xs"
-                  : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
-              }`}
-            >
-              Hair Care
-            </button>
-
-            <button
-              id="nav-skincare-btn"
-              onClick={() => handleCategoryClick("skincare")}
-              className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 ${
-                currentRoute === "shop" && selectedCategory === "skincare"
-                  ? "bg-[#1a3c34] text-white shadow-xs"
-                  : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
-              }`}
-            >
-              Skincare
-            </button>
-
-            <button
-              id="nav-slippers-btn"
-              onClick={() => handleCategoryClick("slippers")}
-              className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 ${
-                currentRoute === "shop" && selectedCategory === "slippers"
-                  ? "bg-[#1a3c34] text-white shadow-xs"
-                  : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
-              }`}
-            >
-              Slippers
-            </button>
-
-            <button
-              id="nav-bags-btn"
-              onClick={() => handleCategoryClick("bags")}
-              className={`px-3 py-1.5 rounded-full transition-all text-xs font-semibold shrink-0 ${
-                currentRoute === "shop" && selectedCategory === "bags"
-                  ? "bg-[#1a3c34] text-white shadow-xs"
-                  : "text-[#1a1a1a]/75 hover:text-[#1a3c34] hover:bg-black/5"
-              }`}
-            >
-              Bags
-            </button>
+              {shopDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                  transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+                  className="absolute left-0 top-full mt-2 min-w-[180px] bg-white rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.12)] border border-black/5 py-1.5 z-50 flex flex-col"
+                  onMouseEnter={() => setShopDropdownOpen(true)}
+                  onMouseLeave={() => setTimeout(() => setShopDropdownOpen(false), 150)}
+                >
+                  <button
+                    onClick={() => {
+                      setSelectedCategory("all");
+                      setShopDropdownOpen(false);
+                      navigate("shop");
+                    }}
+                    className={`w-full px-4 py-2.5 text-left text-xs font-semibold transition-colors ${
+                      currentRoute === "shop" && selectedCategory === "all"
+                        ? "bg-[#1a3c34]/10 text-[#1a3c34]"
+                        : "text-[#1a1a1a] hover:bg-[#1a3c34]/5 hover:text-[#1a3c34]"
+                    }`}
+                  >
+                    All Products
+                  </button>
+                  <hr className="my-1 border-black/5" />
+                  <button
+                    onClick={() => {
+                      handleCategoryClick("hair");
+                      setShopDropdownOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-[#1a1a1a] hover:bg-[#1a3c34]/5 hover:text-[#1a3c34] transition-colors"
+                  >
+                    Hair Care
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleCategoryClick("skincare");
+                      setShopDropdownOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-[#1a1a1a] hover:bg-[#1a3c34]/5 hover:text-[#1a3c34] transition-colors"
+                  >
+                    Skincare
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleCategoryClick("slippers");
+                      setShopDropdownOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-[#1a1a1a] hover:bg-[#1a3c34]/5 hover:text-[#1a3c34] transition-colors"
+                  >
+                    Slippers
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleCategoryClick("bags");
+                      setShopDropdownOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-xs font-semibold text-[#1a1a1a] hover:bg-[#1a3c34]/5 hover:text-[#1a3c34] transition-colors"
+                  >
+                    Bags
+                  </button>
+                </motion.div>
+              )}
+            </div>
 
             <button
               id="nav-about-btn"
@@ -503,7 +548,7 @@ export const Header: React.FC = () => {
                     >
                       <div className="flex items-center space-x-2.5">
                         <ShoppingBag className="w-4 h-4 text-[#1a3c34]" />
-                        <span>Shop All</span>
+                        <span>Shop</span>
                       </div>
                       <span className="text-xs opacity-60">→</span>
                     </button>

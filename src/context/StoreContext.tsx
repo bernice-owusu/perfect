@@ -9,6 +9,62 @@ import type {
   ProductTip,
 } from "../types.ts";
 
+// CSRF Token Management
+let csrfToken: string | null = null;
+let csrfTokenExpiry: number = 0;
+
+async function ensureCsrfToken(): Promise<string> {
+  if (csrfToken && Date.now() < csrfTokenExpiry) return csrfToken;
+  try {
+    const res = await fetch("/api/csrf-token");
+    const data = await res.json();
+    if (data.csrfToken) {
+      csrfToken = data.csrfToken;
+      csrfTokenExpiry = Date.now() + 55 * 60 * 1000; // 55 minutes
+      return csrfToken;
+    }
+  } catch (e) {
+    console.warn("Failed to fetch CSRF token:", e);
+  }
+  return "";
+}
+
+function getAuthHeaders(json = true): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${localStorage.getItem("pfy_admin_access_token") || ""}`,
+  };
+  if (json) headers["Content-Type"] = "application/json";
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+  return headers;
+}
+
+// Authenticated fetch with automatic token refresh on 401
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const headers = { ...getAuthHeaders(false), ...options.headers };
+  let res = await fetch(url, { ...options, headers, credentials: "include" });
+  
+  if (res.status === 401) {
+    // Try to refresh token
+    try {
+      const refreshRes = await fetch("/api/admin/refresh", {
+        method: "POST",
+        credentials: "include",
+      });
+      const refreshData = await refreshRes.json();
+      if (refreshRes.ok && refreshData.accessToken) {
+        localStorage.setItem("pfy_admin_access_token", refreshData.accessToken);
+        // Retry original request with new token
+        const newHeaders = { ...getAuthHeaders(false), ...options.headers };
+        res = await fetch(url, { ...options, headers: newHeaders, credentials: "include" });
+      }
+    } catch (e) {
+      console.error("Token refresh failed:", e);
+    }
+  }
+  
+  return res;
+}
+
 export type AppRoute =
   | "home"
   | "shop"
@@ -181,10 +237,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const refreshData = async () => {
     try {
       if (!hasLoadedRef.current) setIsLoading(true);
+      // Ensure CSRF token is available
+      await ensureCsrfToken();
+      
       const ordersFetch = adminUser
-        ? fetch("/api/orders", {
-            headers: { Authorization: `Bearer ${localStorage.getItem("pfy_admin_token") || ""}` },
-          })
+        ? authFetch("/api/orders", { headers: getAuthHeaders(false) })
         : Promise.resolve(null);
       const [prodsRes, catsRes, setRes, revsRes, ordersRes, tipsRes] = await Promise.all([
         fetch("/api/products?active_only=false"),
@@ -438,16 +495,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAdminUser(user);
   };
 
-  const logoutAdmin = () => {
-    const token = localStorage.getItem("pfy_admin_token");
-    if (token) {
+  const logoutAdmin = async () => {
+    const accessToken = localStorage.getItem("pfy_admin_access_token");
+    if (accessToken) {
+      await ensureCsrfToken();
       fetch("/api/admin/logout", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(false),
+        credentials: "include",
       }).catch(() => {});
     }
-    localStorage.removeItem("pfy_admin_token");
+    localStorage.removeItem("pfy_admin_access_token");
+    localStorage.removeItem("pfy_admin_refresh_token");
     localStorage.removeItem("pfy_admin_user");
+    localStorage.removeItem("pfy_csrf_token");
     setAdminUser(null);
   };
 

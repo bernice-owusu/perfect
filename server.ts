@@ -4,12 +4,196 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 import * as crypto from "crypto";
+import bcrypt from "bcryptjs";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import jwt from "jsonwebtoken";
+import cookieParser from "cookie-parser";
+import { v4 as uuidv4 } from "uuid";
 import { MongoClient, type Db } from "mongodb";
 import type { Product, Category, Order, StoreSettings, CustomerReview, ProductTip } from "./src/types.ts";
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
-app.use(express.json());
+
+// Cookie parser for refresh tokens
+app.use(cookieParser());
+
+// JWT Configuration
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString("hex");
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || crypto.randomBytes(64).toString("hex");
+const ACCESS_TOKEN_EXPIRY = "15m";
+const REFRESH_TOKEN_EXPIRY = "7d";
+
+// Audit Log Storage (in production, use a proper logging service)
+interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  type: "auth" | "admin_action" | "security" | "api_error";
+  action: string;
+  userId?: string;
+  email?: string;
+  ip: string;
+  userAgent: string;
+  details: Record<string, unknown>;
+  success: boolean;
+}
+
+const auditLogs: AuditLogEntry[] = [];
+const MAX_AUDIT_LOGS = 10000;
+
+function writeAuditLog(entry: Omit<AuditLogEntry, "id" | "timestamp">) {
+  const logEntry: AuditLogEntry = {
+    id: uuidv4(),
+    timestamp: new Date().toISOString(),
+    ...entry,
+  };
+  auditLogs.push(logEntry);
+  if (auditLogs.length > MAX_AUDIT_LOGS) {
+    auditLogs.shift();
+  }
+  // In production, also send to logging service (e.g., DataDog, LogRocket, etc.)
+  console.log("[AUDIT]", JSON.stringify(logEntry));
+}
+
+// Failed login tracking for brute-force detection
+const failedLogins = new Map<string, { count: number; lastAttempt: number; lockedUntil?: number }>();
+
+function recordFailedLogin(ip: string, email: string) {
+  const now = Date.now();
+  const record = failedLogins.get(ip) || { count: 0, lastAttempt: now };
+  record.count += 1;
+  record.lastAttempt = now;
+  // Lock after 5 failed attempts for 15 minutes
+  if (record.count >= 5) {
+    record.lockedUntil = now + 15 * 60 * 1000;
+    writeAuditLog({
+      type: "security",
+      action: "account_locked",
+      email,
+      ip,
+      userAgent: "",
+      details: { reason: "Too many failed login attempts", attempts: record.count },
+      success: false,
+    });
+  }
+  failedLogins.set(ip, record);
+}
+
+function isIpLocked(ip: string): boolean {
+  const record = failedLogins.get(ip);
+  if (!record || !record.lockedUntil) return false;
+  if (Date.now() > record.lockedUntil) {
+    failedLogins.delete(ip);
+    return false;
+  }
+  return true;
+}
+
+function clearFailedLogins(ip: string) {
+  failedLogins.delete(ip);
+}
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.paystack.co"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "https://api.paystack.co"],
+      frameSrc: ["'self'", "https://js.paystack.co"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: "Too many requests, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/", limiter);
+
+// Stricter rate limit for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many login attempts, please try again later." },
+});
+app.use("/api/admin/login", authLimiter);
+app.use("/api/paystack/verify", authLimiter);
+
+// CSRF protection (manual implementation for API endpoints)
+const csrfTokens = new Map<string, { token: string; expires: number }>();
+
+function generateCsrfToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+function validateCsrfToken(sessionId: string, token: string): boolean {
+  const stored = csrfTokens.get(sessionId);
+  if (!stored) return false;
+  if (Date.now() > stored.expires) {
+    csrfTokens.delete(sessionId);
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(stored.token), Buffer.from(token));
+}
+
+function csrfMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // Skip CSRF for GET requests and public endpoints
+  const publicPaths = [
+    "/api/health",
+    "/api/revision",
+    "/api/products",
+    "/api/categories",
+    "/api/settings",
+    "/api/reviews",
+    "/api/tips",
+    "/api/paystack/public-key",
+  ];
+  if (req.method === "GET" || publicPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+  // Skip CSRF for admin login (handled by rate limit)
+  if (req.path === "/api/admin/login") {
+    return next();
+  }
+
+  const sessionId = req.headers["x-session-id"] as string || req.ip || "anonymous";
+  const token = req.headers["x-csrf-token"] as string;
+
+  if (!token || !validateCsrfToken(sessionId, token)) {
+    return res.status(403).json({ error: "Invalid CSRF token" });
+  }
+  next();
+}
+
+app.use("/api/", csrfMiddleware);
+
+// Endpoint to get CSRF token
+app.get("/api/csrf-token", (req, res) => {
+  const sessionId = req.headers["x-session-id"] as string || req.ip || "anonymous";
+  const token = generateCsrfToken();
+  csrfTokens.set(sessionId, { token, expires: Date.now() + 60 * 60 * 1000 }); // 1 hour
+  // Clean old tokens periodically
+  if (csrfTokens.size > 1000) {
+    const now = Date.now();
+    for (const [key, val] of csrfTokens.entries()) {
+      if (val.expires < now) csrfTokens.delete(key);
+    }
+  }
+  res.json({ csrfToken: token });
+});
 
 // Default initial data based on PRD requirements
 const initialCategories: Category[] = [
@@ -93,12 +277,27 @@ interface StoreData {
   settings: StoreSettings;
   reviews: CustomerReview[];
   tips: ProductTip[];
+  admins: AdminUser[];
+}
+
+interface AdminUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  role: "admin";
+  createdAt: string;
 }
 
 // Fresh-start seed: default categories + settings only (needed by the
 // storefront). Products, orders, and reviews start empty — they are entered
 // through the admin panel.
-function createEmptyStore(): StoreData {
+async function createEmptyStore(): Promise<StoreData> {
+  const defaultAdminPassword = process.env.ADMIN_PASSWORD || "admin123";
+  const defaultAdmin2Password = process.env.ADMIN2_PASSWORD || "admin123";
+  const passwordHash = await bcrypt.hash(defaultAdminPassword, 12);
+  const passwordHash2 = await bcrypt.hash(defaultAdmin2Password, 12);
+
   return {
     products: [],
     categories: initialCategories,
@@ -106,6 +305,24 @@ function createEmptyStore(): StoreData {
     settings: initialSettings,
     reviews: [],
     tips: [],
+    admins: [
+      {
+        id: "admin-1",
+        email: process.env.ADMIN_EMAIL || "admin@perfectforyou.com",
+        passwordHash,
+        name: "Store Administrator",
+        role: "admin",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "admin-2",
+        email: process.env.ADMIN2_EMAIL || "bernyx.owusu@gmail.com",
+        passwordHash: passwordHash2,
+        name: "Bernice Owusu",
+        role: "admin",
+        createdAt: new Date().toISOString(),
+      },
+    ],
   };
 }
 
@@ -155,6 +372,10 @@ async function loadStoreFromDb(): Promise<StoreData | null> {
     if (!data.products) data.products = [];
     if (!data.categories) data.categories = [];
     if (!data.settings) data.settings = initialSettings;
+    if (!data.admins) {
+      const emptyStore = await createEmptyStore();
+      data.admins = emptyStore.admins;
+    }
     return data as unknown as StoreData;
   } catch (err) {
     console.error("Error reading store from MongoDB:", err);
@@ -198,8 +419,14 @@ async function initStore(): Promise<StoreData> {
   const fromDb = await loadStoreFromDb();
   if (fromDb) {
     store = fromDb;
+    // Ensure admins array exists for backward compatibility
+    if (!store.admins) {
+      store.admins = await (await createEmptyStore()).admins;
+      await saveData(store);
+    }
     return store;
   }
+  store = await createEmptyStore();
   await saveData(store);
   return store;
 }
@@ -271,7 +498,7 @@ app.get("/api/settings", async (_req, res) => {
   res.json({ settings: store.settings });
 });
 
-app.put("/api/settings", requireAdmin, async (req, res) => {
+app.put("/api/settings", requireAdmin, auditAdminAction("settings_update"), async (req, res) => {
   store.settings = { ...store.settings, ...req.body };
   await saveData(store);
   res.json({ success: true, settings: store.settings });
@@ -290,7 +517,7 @@ app.get("/api/categories", async (_req, res) => {
   res.json({ categories: categoriesWithCounts });
 });
 
-app.post("/api/categories", requireAdmin, async (req, res) => {
+app.post("/api/categories", requireAdmin, auditAdminAction("category_create"), async (req, res) => {
   const { name, description, image, is_active } = req.body;
   if (!name) {
     return res.status(400).json({ error: "Category name is required" });
@@ -309,7 +536,7 @@ app.post("/api/categories", requireAdmin, async (req, res) => {
   res.status(201).json({ success: true, category: newCat });
 });
 
-app.put("/api/categories/:id", requireAdmin, async (req, res) => {
+app.put("/api/categories/:id", requireAdmin, auditAdminAction("category_update"), async (req, res) => {
   const index = store.categories.findIndex((c) => c.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Category not found" });
 
@@ -326,7 +553,7 @@ app.put("/api/categories/:id", requireAdmin, async (req, res) => {
   res.json({ success: true, category: store.categories[index] });
 });
 
-app.delete("/api/categories/:id", requireAdmin, async (req, res) => {
+app.delete("/api/categories/:id", requireAdmin, auditAdminAction("category_delete"), async (req, res) => {
   const index = store.categories.findIndex((c) => c.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Category not found" });
 
@@ -355,7 +582,7 @@ app.get("/api/tips/all", requireAdmin, async (_req, res) => {
   res.json({ tips: allTips });
 });
 
-app.post("/api/tips", requireAdmin, async (req, res) => {
+app.post("/api/tips", requireAdmin, auditAdminAction("tip_create"), async (req, res) => {
   const { title, description, image, product_id, category_id, is_active, display_order } = req.body;
   if (!title || !image) {
     return res.status(400).json({ error: "Title and image are required" });
@@ -392,7 +619,7 @@ app.post("/api/tips", requireAdmin, async (req, res) => {
   res.status(201).json({ success: true, tip: newTip });
 });
 
-app.put("/api/tips/:id", requireAdmin, async (req, res) => {
+app.put("/api/tips/:id", requireAdmin, auditAdminAction("tip_update"), async (req, res) => {
   const index = store.tips.findIndex((t) => t.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Tip not found" });
 
@@ -411,7 +638,7 @@ app.put("/api/tips/:id", requireAdmin, async (req, res) => {
   res.json({ success: true, tip: store.tips[index] });
 });
 
-app.delete("/api/tips/:id", requireAdmin, async (req, res) => {
+app.delete("/api/tips/:id", requireAdmin, auditAdminAction("tip_delete"), async (req, res) => {
   const index = store.tips.findIndex((t) => t.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Tip not found" });
 
@@ -490,7 +717,7 @@ app.get("/api/products/:idOrSlug", async (req, res) => {
   res.json({ product: prod });
 });
 
-app.post("/api/products", requireAdmin, async (req, res) => {
+app.post("/api/products", requireAdmin, auditAdminAction("product_create"), async (req, res) => {
   const {
     name,
     category_id,
@@ -545,7 +772,7 @@ app.post("/api/products", requireAdmin, async (req, res) => {
   res.status(201).json({ success: true, product: newProd });
 });
 
-app.put("/api/products/:id", requireAdmin, async (req, res) => {
+app.put("/api/products/:id", requireAdmin, auditAdminAction("product_update"), async (req, res) => {
   const index = store.products.findIndex((p) => p.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Product not found" });
 
@@ -569,7 +796,7 @@ app.put("/api/products/:id", requireAdmin, async (req, res) => {
   res.json({ success: true, product: updated });
 });
 
-app.delete("/api/products/:id", requireAdmin, async (req, res) => {
+app.delete("/api/products/:id", requireAdmin, auditAdminAction("product_delete"), async (req, res) => {
   const index = store.products.findIndex((p) => p.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Product not found" });
 
@@ -686,7 +913,7 @@ app.get("/api/orders", requireAdmin, async (req, res) => {
   res.json({ orders: list, total: list.length });
 });
 
-app.put("/api/orders/:id/status", requireAdmin, async (req, res) => {
+app.put("/api/orders/:id/status", requireAdmin, auditAdminAction("order_status_update"), async (req, res) => {
   const { status, order_status, delivery_contact_status, delivery_note } = req.body;
   const order = store.orders.find((o) => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: "Order not found" });
@@ -771,42 +998,210 @@ const adminTokens = new Set<string>();
 function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   const auth = req.headers.authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  
+  // Check legacy in-memory token first (backward compatibility)
   if (token && adminTokens.has(token)) return next();
+  
+  // Check JWT access token
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { sub: string; role: string };
+      if (decoded.role === "admin") {
+        (req as any).admin = decoded;
+        return next();
+      }
+    } catch (err) {
+      // Token invalid or expired
+    }
+  }
+  
   return res.status(401).json({ error: "Unauthorized: admin sign-in required." });
 }
 
-// Admin Auth
-app.post("/api/admin/login", (req, res) => {
-  const { email, password } = req.body;
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@perfectforyou.com";
-  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-  const admin2Email = process.env.ADMIN2_EMAIL || "bernyx.owusu@gmail.com";
-  const admin2Password = process.env.ADMIN2_PASSWORD || "admin123";
+// Audit logging middleware for admin actions
+function auditAdminAction(action: string) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const originalSend = res.send;
+    res.send = function (body?: any): express.Response {
+      const admin = (req as any).admin;
+      const success = res.statusCode >= 200 && res.statusCode < 400;
+      writeAuditLog({
+        type: "admin_action",
+        action,
+        userId: admin?.sub,
+        email: admin?.email,
+        ip: req.ip || "",
+        userAgent: req.headers["user-agent"] || "",
+        details: {
+          method: req.method,
+          path: req.path,
+          body: req.method !== "GET" ? req.body : undefined,
+          params: req.params,
+          query: req.query,
+        },
+        success,
+      });
+      return originalSend.call(this, body);
+    };
+    next();
+  };
+}
 
-  if (
-    (email === adminEmail && password === adminPassword) ||
-    (email === admin2Email && password === admin2Password)
-  ) {
-    const token = crypto.randomBytes(32).toString("hex");
-    adminTokens.add(token);
-    return res.json({
-      success: true,
-      token,
-      user: {
-        name: "Store Administrator",
-        email,
-        role: "admin",
-      },
-    });
+// Admin Auth - uses bcrypt to verify against stored hashed passwords in MongoDB
+// Returns JWT access token + refresh token (httpOnly cookie)
+app.post("/api/admin/login", async (req, res) => {
+  const { email, password } = req.body;
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const userAgent = req.headers["user-agent"] || "";
+
+  if (!email || !password) {
+    writeAuditLog({ type: "auth", action: "login_failed", ip, userAgent, details: { reason: "Missing credentials" }, success: false });
+    return res.status(400).json({ error: "Email and password are required" });
   }
-  return res.status(401).json({ error: "Invalid admin email or password. Use demo login or admin@perfectforyou.com / admin123." });
+
+  // Check IP lockout
+  if (isIpLocked(ip)) {
+    writeAuditLog({ type: "security", action: "login_blocked", ip, userAgent, details: { reason: "IP temporarily locked" }, success: false });
+    return res.status(429).json({ error: "Too many failed attempts. Please try again later." });
+  }
+
+  await refreshStore();
+  const admin = store.admins?.find((a: any) => a.email === email);
+  if (!admin || !admin.passwordHash) {
+    recordFailedLogin(ip, email);
+    writeAuditLog({ type: "auth", action: "login_failed", email, ip, userAgent, details: { reason: "Invalid email" }, success: false });
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const valid = await bcrypt.compare(password, admin.passwordHash);
+  if (!valid) {
+    recordFailedLogin(ip, email);
+    writeAuditLog({ type: "auth", action: "login_failed", email, ip, userAgent, details: { reason: "Invalid password" }, success: false });
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  // Success - clear failed attempts
+  clearFailedLogins(ip);
+
+  // Generate JWT tokens
+  const accessToken = jwt.sign(
+    { sub: admin.id, email: admin.email, role: "admin" },
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_EXPIRY }
+  );
+  const refreshToken = jwt.sign(
+    { sub: admin.id, type: "refresh" },
+    JWT_REFRESH_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRY }
+  );
+
+  // Store refresh token hash in admin record for revocation
+  const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+  admin.refreshTokenHash = refreshTokenHash;
+  admin.lastLogin = new Date().toISOString();
+  await saveData(store);
+
+  // Set refresh token as httpOnly cookie
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/api/admin/refresh",
+  });
+
+  writeAuditLog({ type: "auth", action: "login_success", userId: admin.id, email: admin.email, ip, userAgent, details: {}, success: true });
+
+  return res.json({
+    success: true,
+    accessToken,
+    user: {
+      name: admin.name || "Store Administrator",
+      email: admin.email,
+      role: "admin",
+    },
+  });
 });
 
-// Admin logout (invalidates the token immediately)
-app.post("/api/admin/logout", requireAdmin, (req, res) => {
+// Refresh access token using refresh token cookie
+app.post("/api/admin/refresh", async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken;
+  if (!refreshToken) {
+    return res.status(401).json({ error: "Refresh token required" });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { sub: string; type: string };
+    if (decoded.type !== "refresh") {
+      return res.status(401).json({ error: "Invalid token type" });
+    }
+
+    await refreshStore();
+    const admin = store.admins?.find((a: any) => a.id === decoded.sub);
+    if (!admin || !admin.refreshTokenHash) {
+      return res.status(401).json({ error: "Invalid refresh token" });
+    }
+
+    const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+    if (admin.refreshTokenHash !== refreshTokenHash) {
+      writeAuditLog({ type: "security", action: "refresh_token_reuse_detected", userId: admin.id, ip: req.ip || "", userAgent: req.headers["user-agent"] || "", details: {}, success: false });
+      // Revoke all tokens for this user
+      admin.refreshTokenHash = undefined;
+      await saveData(store);
+      return res.status(401).json({ error: "Token revoked" });
+    }
+
+    // Generate new access token
+    const accessToken = jwt.sign(
+      { sub: admin.id, email: admin.email, role: "admin" },
+      JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
+    );
+
+    return res.json({ success: true, accessToken });
+  } catch (err) {
+    writeAuditLog({ type: "auth", action: "refresh_failed", ip: req.ip || "", userAgent: req.headers["user-agent"] || "", details: { error: String(err) }, success: false });
+    return res.status(401).json({ error: "Invalid or expired refresh token" });
+  }
+});
+
+// Admin logout - revokes refresh token
+app.post("/api/admin/logout", async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken;
   const auth = req.headers.authorization || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  adminTokens.delete(token);
+  const accessToken = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+
+  // Try to identify admin from access token for audit log
+  let adminId: string | undefined;
+  if (accessToken) {
+    try {
+      const decoded = jwt.verify(accessToken, JWT_SECRET) as { sub: string };
+      adminId = decoded.sub;
+    } catch {}
+  }
+
+  if (refreshToken) {
+    const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+    await refreshStore();
+    const admin = store.admins?.find((a: any) => a.refreshTokenHash === refreshTokenHash);
+    if (admin) {
+      admin.refreshTokenHash = undefined;
+      await saveData(store);
+    }
+  }
+
+  // Clear refresh token cookie
+  res.clearCookie("refreshToken", { path: "/api/admin/refresh" });
+
+  // Also remove from legacy in-memory tokens
+  if (accessToken) {
+    adminTokens.delete(accessToken);
+  }
+
+  if (adminId) {
+    writeAuditLog({ type: "auth", action: "logout", userId: adminId, ip: req.ip || "", userAgent: req.headers["user-agent"] || "", details: {}, success: true });
+  }
+
   return res.json({ success: true });
 });
 
@@ -830,8 +1225,39 @@ app.get("/api/admin/stats", requireAdmin, async (_req, res) => {
   });
 });
 
+// Audit Logs (admin only)
+app.get("/api/admin/audit-logs", requireAdmin, async (req, res) => {
+  const { type, limit = 100, offset = 0 } = req.query;
+  let logs = [...auditLogs].reverse(); // newest first
+  
+  if (type) {
+    logs = logs.filter((l) => l.type === type);
+  }
+  
+  const start = Number(offset);
+  const end = start + Number(limit);
+  const paginated = logs.slice(start, end);
+  
+  res.json({
+    logs: paginated,
+    total: logs.length,
+    offset: start,
+    limit: Number(limit),
+  });
+});
+
+// Failed login attempts (for monitoring)
+app.get("/api/admin/failed-logins", requireAdmin, (_req, res) => {
+  const now = Date.now();
+  const locked = Array.from(failedLogins.entries())
+    .filter(([, v]) => v.lockedUntil && v.lockedUntil > now)
+    .map(([ip, v]) => ({ ip, ...v }));
+  
+  res.json({ lockedIps: locked, totalTracked: failedLogins.size });
+});
+
 // Image Upload Endpoint
-app.post("/api/upload/image", requireAdmin, upload.single("image"), (req, res) => {
+app.post("/api/upload/image", requireAdmin, auditAdminAction("image_upload"), upload.single("image"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No image file provided" });
   }
@@ -846,7 +1272,7 @@ app.get("/api/reviews", async (_req, res) => {
 });
 
 // Customer review submission (admin adds on behalf of customer) - recomputes the product's live rating
-app.post("/api/reviews", requireAdmin, async (req, res) => {
+app.post("/api/reviews", requireAdmin, auditAdminAction("review_create"), async (req, res) => {
   const { product_id, author, location, rating, comment, verified_purchase } = req.body;
   if (!product_id || !author || !rating) {
     return res.status(400).json({ error: "Product, author name and rating are required" });
@@ -884,7 +1310,7 @@ app.post("/api/reviews", requireAdmin, async (req, res) => {
 });
 
 // Review moderation (admin): delete a review and recompute product rating
-app.delete("/api/reviews/:id", requireAdmin, async (req, res) => {
+app.delete("/api/reviews/:id", requireAdmin, auditAdminAction("review_delete"), async (req, res) => {
   await refreshStore();
   const idx = store.reviews.findIndex((r) => r.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: "Review not found" });

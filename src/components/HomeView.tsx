@@ -29,7 +29,9 @@ export const HomeView: React.FC = () => {
     .filter((p) => p.category_id === "cat-bags" && p.is_active && !p.is_set)
     .slice(0, 4);
   const accessoriesProducts = products
-    .filter((p) => p.category_id === "cat-accessories" && p.is_active && !p.is_set)
+    .filter(
+      (p) => p.category_id === "cat-accessories" && p.is_active && !p.is_set,
+    )
     .slice(0, 4);
   const setProducts = products
     .filter((p) => p.is_set && p.is_active)
@@ -68,7 +70,7 @@ export const HomeView: React.FC = () => {
 
               <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl leading-[1.08] text-[#1a3c34] tracking-tight font-medium">
                 Beauty, Care <br />
-                & Style— <br />
+                & Style. <br />
                 <span className="italic font-normal">Perfect For You</span>
               </h1>
 
