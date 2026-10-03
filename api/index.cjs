@@ -195,7 +195,7 @@ async function initStore() {
   await saveData(store);
   return store;
 }
-var uploadDir = import_path.default.join(process.cwd(), "public", "uploads");
+var uploadDir = process.env.UPLOAD_DIR || import_path.default.join(process.cwd(), "public", "uploads");
 if (!import_fs.default.existsSync(uploadDir)) {
   import_fs.default.mkdirSync(uploadDir, { recursive: true });
 }
@@ -573,7 +573,11 @@ function requireAdmin(req, res, next) {
 }
 app.post("/api/admin/login", (req, res) => {
   const { email, password } = req.body;
-  if (email === "admin@perfectforyou.com" && password === "admin123" || email === "bernyx.owusu@gmail.com" && password === "admin123") {
+  const adminEmail = process.env.ADMIN_EMAIL || "admin@perfectforyou.com";
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+  const admin2Email = process.env.ADMIN2_EMAIL || "bernyx.owusu@gmail.com";
+  const admin2Password = process.env.ADMIN2_PASSWORD || "admin123";
+  if (email === adminEmail && password === adminPassword || email === admin2Email && password === admin2Password) {
     const token = crypto.randomBytes(32).toString("hex");
     adminTokens.add(token);
     return res.json({

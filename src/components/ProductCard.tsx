@@ -41,15 +41,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       {/* Product Image & Badges */}
       <div className="relative aspect-4/5 w-full bg-[#eae7e0] overflow-hidden">
         <img
-          src={product.images[0] || "/images/pfy_hair_set.jpg"}
+          src={product.images[0]}
           alt={product.name}
           loading="lazy"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            if (!target.src.includes("/images/pfy_hair_set.jpg")) {
-              target.src = "/images/pfy_hair_set.jpg";
-            }
-          }}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
         />
 

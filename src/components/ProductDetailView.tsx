@@ -128,18 +128,8 @@ export const ProductDetailView: React.FC = () => {
           {/* Main Large Image */}
           <div className="relative aspect-4/5 w-full bg-[#eae7e0] rounded-3xl overflow-hidden border border-black/5 card-shadow">
             <img
-              src={
-                product.images[activeImageIdx] ||
-                product.images[0] ||
-                "/images/pfy_hair_set.jpg"
-              }
+              src={product.images[activeImageIdx] || product.images[0]}
               alt={product.name}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                if (!target.src.includes("/images/pfy_hair_set.jpg")) {
-                  target.src = "/images/pfy_hair_set.jpg";
-                }
-              }}
               className="w-full h-full object-cover object-center"
             />
 
@@ -184,17 +174,11 @@ export const ProductDetailView: React.FC = () => {
                       : "border-stone-200 opacity-70 hover:opacity-100"
                   }`}
                 >
-                  <img
-                    src={img}
-                    alt=""
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      if (!target.src.includes("/images/pfy_hair_set.jpg")) {
-                        target.src = "/images/pfy_hair_set.jpg";
-                      }
-                    }}
-                    className="w-full h-full object-cover object-center"
-                  />
+<img
+                      src={img}
+                      alt=""
+                      className="w-full h-full object-cover object-center"
+                    />
                 </button>
               ))}
             </div>
@@ -438,7 +422,7 @@ export const ProductDetailView: React.FC = () => {
                 {/* Product 1 */}
                 <div className="relative">
                   <img
-                    src={product.images[0] || "/images/pfy_hair_set.jpg"}
+                    src={product.images[0]}
                     alt={product.name}
                     className="w-14 h-16 sm:w-16 sm:h-20 rounded-xl object-cover bg-stone-100 border border-stone-200"
                   />
@@ -452,7 +436,7 @@ export const ProductDetailView: React.FC = () => {
                 {/* Product 2 (Companion) */}
                 <div className="relative">
                   <img
-                    src={bundleCompanion.images[0] || "/images/pfy_hair_mist.jpg"}
+                    src={bundleCompanion.images[0]}
                     alt={bundleCompanion.name}
                     className="w-14 h-16 sm:w-16 sm:h-20 rounded-xl object-cover bg-stone-100 border border-stone-200"
                   />

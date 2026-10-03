@@ -367,17 +367,11 @@ export const CheckoutView: React.FC = () => {
                     className="flex items-center justify-between text-xs py-1"
                   >
                     <div className="flex items-center space-x-3 min-w-0 pr-2">
-                      <img
-                        src={item.product.images[0] || "/images/pfy_hair_set.jpg"}
-                        alt=""
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (!target.src.includes("/images/pfy_hair_set.jpg")) {
-                            target.src = "/images/pfy_hair_set.jpg";
-                          }
-                        }}
-                        className="w-12 h-14 object-cover rounded-xl bg-[#eae7e0] shrink-0"
-                      />
+<img
+                          src={item.product.images[0]}
+                          alt=""
+                          className="w-12 h-14 object-cover rounded-xl bg-[#eae7e0] shrink-0"
+                        />
                       <div className="truncate">
                         <span className="font-semibold text-stone-900 block truncate">
                           {item.product.name}

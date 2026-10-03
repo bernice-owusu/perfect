@@ -80,14 +80,8 @@ export const CartDrawer: React.FC = () => {
                 >
                   {/* Thumbnail */}
                   <img
-                    src={item.product.images[0] || "/images/pfy_hair_set.jpg"}
+                    src={item.product.images[0]}
                     alt={item.product.name}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      if (!target.src.includes("/images/pfy_hair_set.jpg")) {
-                        target.src = "/images/pfy_hair_set.jpg";
-                      }
-                    }}
                     className="w-18 h-20 object-cover rounded-xl bg-[#eae7e0] shrink-0"
                   />
 

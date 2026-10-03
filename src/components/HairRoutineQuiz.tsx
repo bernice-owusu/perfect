@@ -460,11 +460,11 @@ export const HairRoutineQuiz: React.FC = () => {
                   <div className="divide-y divide-stone-100">
                     {recommendedProducts.map((p) => (
                       <div key={p.id} className="py-3 flex items-center space-x-3">
-                        <img
-                          src={p.images[0] || "/images/pfy_hair_set.jpg"}
-                          alt={p.name}
-                          className="w-12 h-14 object-cover rounded-xl bg-stone-100 shrink-0"
-                        />
+<img
+                            src={p.images[0]}
+                            alt={p.name}
+                            className="w-12 h-14 object-cover rounded-xl bg-stone-100 shrink-0"
+                          />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-stone-900 truncate">{p.name}</p>
                           <p className="text-[11px] text-stone-500">{p.sizes?.[0] || "Standard"}</p>

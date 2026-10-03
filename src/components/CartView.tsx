@@ -67,17 +67,11 @@ export const CartView: React.FC = () => {
                 className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div className="flex items-start sm:items-center space-x-3.5 sm:space-x-4">
-                  <img
-                    src={item.product.images[0] || "/images/pfy_hair_set.jpg"}
-                    alt={item.product.name}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      if (!target.src.includes("/images/pfy_hair_set.jpg")) {
-                        target.src = "/images/pfy_hair_set.jpg";
-                      }
-                    }}
-                    className="w-16 h-18 sm:w-20 sm:h-22 object-cover rounded-2xl bg-[#eae7e0] shrink-0"
-                  />
+<img
+                      src={item.product.images[0]}
+                      alt={item.product.name}
+                      className="w-16 h-18 sm:w-20 sm:h-22 object-cover rounded-2xl bg-[#eae7e0] shrink-0"
+                    />
                   <div>
                     <h3 className="font-serif font-semibold text-[#1a1a1a] text-sm sm:text-base">
                       {item.product.name}
