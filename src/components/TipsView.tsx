@@ -88,15 +88,14 @@ export const TipsView: React.FC = () => {
 
           {/* Search & Filter Bar */}
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="w-5 h-5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search tips, products, categories..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 text-sm bg-white/10 border border-white/20 rounded-full focus:outline-none focus:ring-2 focus:ring-white/30 focus:bg-white/15 placeholder:text-stone-400 text-white transition-all"
-              />
+            <div className="relative flex-1 lg:hidden">
+              <button
+                onClick={() => setMobileFilterOpen(true)}
+                className="w-full px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium flex items-center justify-center gap-2 border border-white/20 transition-colors"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filter</span>
+              </button>
             </div>
           </div>
         </div>
