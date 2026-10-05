@@ -85,19 +85,6 @@ export const TipsView: React.FC = () => {
               </button>
             </div>
           </div>
-
-          {/* Search & Filter Bar */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1 lg:hidden">
-              <button
-                onClick={() => setMobileFilterOpen(true)}
-                className="w-full px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full text-sm font-medium flex items-center justify-center gap-2 border border-white/20 transition-colors"
-              >
-                <Filter className="w-4 h-4" />
-                <span>Filter</span>
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 

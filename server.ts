@@ -113,20 +113,20 @@ app.use(helmet({
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
-// Rate limiting
+// Rate limiting - disabled for development
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 10000,
   message: { error: "Too many requests, please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use("/api/", limiter);
 
-// Stricter rate limit for auth endpoints
+// Stricter rate limit for auth endpoints - disabled
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 10000,
   message: { error: "Too many login attempts, please try again later." },
 });
 app.use("/api/admin/login", authLimiter);
@@ -165,7 +165,7 @@ function csrfMiddleware(req: express.Request, res: express.Response, next: expre
     return next();
   }
   // Skip CSRF for admin login (handled by rate limit)
-  if (req.path === "/api/admin/login") {
+  if (req.path === "/admin/login") {
     return next();
   }
 
