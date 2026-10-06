@@ -287,6 +287,8 @@ interface AdminUser {
   name: string;
   role: "admin";
   createdAt: string;
+  refreshTokenHash?: string;
+  lastLogin?: string;
 }
 
 // Fresh-start seed: default categories + settings only (needed by the
@@ -326,7 +328,15 @@ async function createEmptyStore(): Promise<StoreData> {
   };
 }
 
-let store: StoreData = createEmptyStore();
+let store: StoreData = {
+  products: [],
+  categories: initialCategories,
+  orders: [],
+  settings: initialSettings,
+  reviews: [],
+  tips: [],
+  admins: [],
+};
 
 // Bumped on every saveData() so clients (storefront + admin) can auto-sync
 let storeRevision = 0;
@@ -1163,6 +1173,63 @@ app.post("/api/admin/refresh", async (req, res) => {
     writeAuditLog({ type: "auth", action: "refresh_failed", ip: req.ip || "", userAgent: req.headers["user-agent"] || "", details: { error: String(err) }, success: false });
     return res.status(401).json({ error: "Invalid or expired refresh token" });
   }
+});
+
+// Admin change password
+app.post("/api/admin/change-password", requireAdmin, auditAdminAction("password_change"), async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const admin = (req as any).admin;
+  
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Current password and new password are required" });
+  }
+  
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters" });
+  }
+  
+  await refreshStore();
+  const adminUser = store.admins?.find((a: any) => a.id === admin.sub);
+  
+  if (!adminUser || !adminUser.passwordHash) {
+    return res.status(404).json({ error: "Admin user not found" });
+  }
+  
+  const valid = await bcrypt.compare(currentPassword, adminUser.passwordHash);
+  if (!valid) {
+    writeAuditLog({
+      type: "auth",
+      action: "password_change_failed",
+      userId: admin.sub,
+      email: admin.email,
+      ip: req.ip || "",
+      userAgent: req.headers["user-agent"] || "",
+      details: { reason: "Invalid current password" },
+      success: false,
+    });
+    return res.status(401).json({ error: "Current password is incorrect" });
+  }
+  
+  const newPasswordHash = await bcrypt.hash(newPassword, 12);
+  adminUser.passwordHash = newPasswordHash;
+  
+  // Invalidate all refresh tokens for this admin (force re-login on other devices)
+  adminUser.refreshTokenHash = undefined;
+  
+  await saveData(store);
+  
+  writeAuditLog({
+    type: "auth",
+    action: "password_changed",
+    userId: admin.sub,
+    email: admin.email,
+    ip: req.ip || "",
+    userAgent: req.headers["user-agent"] || "",
+    details: {},
+    success: true,
+  });
+  
+  return res.json({ success: true, message: "Password changed successfully. Please log in again." });
 });
 
 // Admin logout - revokes refresh token

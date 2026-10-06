@@ -137,6 +137,10 @@ export const AdminPortal: React.FC = () => {
 
   // Settings form state
   const [tempSettings, setTempSettings] = useState<StoreSettings | null>(settings);
+  const [passwordChange, setPasswordChange] = useState({ current: "", new: "", confirm: "" });
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Product Search in Admin
   const [productSearch, setProductSearch] = useState("");
@@ -612,6 +616,54 @@ export const AdminPortal: React.FC = () => {
     } catch (err) {
       console.error(err);
       alert("Failed to delete review");
+    }
+  };
+
+  // Change Password
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+    
+    if (passwordChange.new !== passwordChange.confirm) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+    
+    if (passwordChange.new.length < 8) {
+      setPasswordError("New password must be at least 8 characters");
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    
+    try {
+      const res = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({
+          currentPassword: passwordChange.current,
+          newPassword: passwordChange.new,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setPasswordSuccess("Password changed successfully. You will be logged out.");
+        setPasswordChange({ current: "", new: "", confirm: "" });
+        // Log out after a short delay
+        setTimeout(() => {
+          logoutAdmin();
+        }, 2000);
+      } else {
+        setPasswordError(data.error || "Failed to change password");
+      }
+    } catch (err) {
+      console.error(err);
+      setPasswordError("An error occurred. Please try again.");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -2039,6 +2091,71 @@ export const AdminPortal: React.FC = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Change Password Section */}
+              <div className="space-y-4 pt-4 border-t border-stone-100">
+                <h3 className="font-serif text-base font-semibold text-stone-900 pb-2 border-b border-stone-100">
+                  Change Admin Password
+                </h3>
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Current Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={passwordChange.current}
+                      onChange={(e) => setPasswordChange({ ...passwordChange, current: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      New Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={passwordChange.new}
+                      onChange={(e) => setPasswordChange({ ...passwordChange, new: e.target.value })}
+                      minLength={8}
+                      className="w-full px-4 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                    />
+                    <p className="text-xs text-stone-500 mt-1">Must be at least 8 characters</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Confirm New Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={passwordChange.confirm}
+                      onChange={(e) => setPasswordChange({ ...passwordChange, confirm: e.target.value })}
+                      className="w-full px-4 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a3c34]"
+                    />
+                  </div>
+
+                  {passwordError && (
+                    <p className="text-xs text-rose-600">{passwordError}</p>
+                  )}
+                  {passwordSuccess && (
+                    <p className="text-xs text-emerald-600">{passwordSuccess}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword}
+                    className="px-6 py-3 bg-amber-700 hover:bg-amber-800 text-white rounded-full text-xs font-semibold flex items-center space-x-2 shadow-sm"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isChangingPassword ? "Changing..." : "Change Password"}</span>
+                  </button>
+                </form>
               </div>
 
               <button

@@ -118,9 +118,7 @@ app.use(import_express.default.json({ limit: "10kb" }));
 app.use(import_express.default.urlencoded({ extended: true, limit: "10kb" }));
 var limiter = (0, import_express_rate_limit.default)({
   windowMs: 15 * 60 * 1e3,
-  // 15 minutes
-  max: 100,
-  // limit each IP to 100 requests per windowMs
+  max: 1e4,
   message: { error: "Too many requests, please try again later." },
   standardHeaders: true,
   legacyHeaders: false
@@ -128,7 +126,7 @@ var limiter = (0, import_express_rate_limit.default)({
 app.use("/api/", limiter);
 var authLimiter = (0, import_express_rate_limit.default)({
   windowMs: 15 * 60 * 1e3,
-  max: 5,
+  max: 1e4,
   message: { error: "Too many login attempts, please try again later." }
 });
 app.use("/api/admin/login", authLimiter);
@@ -160,7 +158,7 @@ function csrfMiddleware(req, res, next) {
   if (req.method === "GET" || publicPaths.some((p) => req.path.startsWith(p))) {
     return next();
   }
-  if (req.path === "/api/admin/login") {
+  if (req.path === "/admin/login") {
     return next();
   }
   const sessionId = req.headers["x-session-id"] || req.ip || "anonymous";
@@ -286,7 +284,15 @@ async function createEmptyStore() {
     ]
   };
 }
-var store = createEmptyStore();
+var store = {
+  products: [],
+  categories: initialCategories,
+  orders: [],
+  settings: initialSettings,
+  reviews: [],
+  tips: [],
+  admins: []
+};
 var storeRevision = 0;
 var MONGO_COLLECTION = "store";
 var mongoDb = null;
@@ -953,6 +959,50 @@ app.post("/api/admin/refresh", async (req, res) => {
     writeAuditLog({ type: "auth", action: "refresh_failed", ip: req.ip || "", userAgent: req.headers["user-agent"] || "", details: { error: String(err) }, success: false });
     return res.status(401).json({ error: "Invalid or expired refresh token" });
   }
+});
+app.post("/api/admin/change-password", requireAdmin, auditAdminAction("password_change"), async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const admin = req.admin;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Current password and new password are required" });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters" });
+  }
+  await refreshStore();
+  const adminUser = store.admins?.find((a) => a.id === admin.sub);
+  if (!adminUser || !adminUser.passwordHash) {
+    return res.status(404).json({ error: "Admin user not found" });
+  }
+  const valid = await import_bcryptjs.default.compare(currentPassword, adminUser.passwordHash);
+  if (!valid) {
+    writeAuditLog({
+      type: "auth",
+      action: "password_change_failed",
+      userId: admin.sub,
+      email: admin.email,
+      ip: req.ip || "",
+      userAgent: req.headers["user-agent"] || "",
+      details: { reason: "Invalid current password" },
+      success: false
+    });
+    return res.status(401).json({ error: "Current password is incorrect" });
+  }
+  const newPasswordHash = await import_bcryptjs.default.hash(newPassword, 12);
+  adminUser.passwordHash = newPasswordHash;
+  adminUser.refreshTokenHash = void 0;
+  await saveData(store);
+  writeAuditLog({
+    type: "auth",
+    action: "password_changed",
+    userId: admin.sub,
+    email: admin.email,
+    ip: req.ip || "",
+    userAgent: req.headers["user-agent"] || "",
+    details: {},
+    success: true
+  });
+  return res.json({ success: true, message: "Password changed successfully. Please log in again." });
 });
 app.post("/api/admin/logout", async (req, res) => {
   const refreshToken = req.cookies?.refreshToken;
